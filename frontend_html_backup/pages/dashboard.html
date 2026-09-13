@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>BudgetIQ — Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap" rel="stylesheet"/>
+  <style>
+    @layer base {
+      html, body { margin: 0; padding: 0; }
+      body { overscroll-behavior: none; }
+      main > :first-child { margin-top: 0 !important; }
+      main > :last-child  { margin-bottom: 0 !important; }
+    }
+    ::-webkit-scrollbar { display: none; }
+  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "error-container": "#ffdad6",
+            "tertiary-fixed-dim": "#bec6e0",
+            "secondary-container": "#fe932c",
+            "surface-container-lowest": "#ffffff",
+            "background": "#f8f9ff",
+            "on-tertiary-fixed-variant": "#3f465c",
+            "primary-fixed-dim": "#b4c5ff",
+            "on-primary-fixed-variant": "#003ea8",
+            "on-secondary-fixed-variant": "#6e3900",
+            "on-secondary-container": "#663500",
+            "on-error": "#ffffff",
+            "surface-container-low": "#eff4ff",
+            "secondary-fixed": "#ffdcc3",
+            "outline-variant": "#c3c6d7",
+            "on-surface": "#0b1c30",
+            "on-surface-variant": "#434655",
+            "on-background": "#0b1c30",
+            "on-error-container": "#93000a",
+            "outline": "#737686",
+            "inverse-primary": "#b4c5ff",
+            "on-primary-container": "#eeefff",
+            "primary-container": "#2563eb",
+            "tertiary-container": "#656d84",
+            "error": "#ba1a1a",
+            "surface": "#f8f9ff",
+            "surface-container-highest": "#d3e4fe",
+            "on-tertiary-container": "#eef0ff",
+            "surface-bright": "#f8f9ff",
+            "on-secondary-fixed": "#2f1500",
+            "surface-tint": "#0053db",
+            "surface-container": "#e5eeff",
+            "secondary-fixed-dim": "#ffb77d",
+            "tertiary": "#4d556b",
+            "primary-fixed": "#dbe1ff",
+            "secondary": "#904d00",
+            "surface-variant": "#d3e4fe",
+            "on-primary": "#ffffff",
+            "inverse-on-surface": "#eaf1ff",
+            "tertiary-fixed": "#dae2fd",
+            "on-primary-fixed": "#00174b",
+            "on-secondary": "#ffffff",
+            "surface-container-high": "#dce9ff",
+            "on-tertiary-fixed": "#131b2e",
+            "primary": "#004ac6",
+            "inverse-surface": "#213145",
+            "on-tertiary": "#ffffff",
+            "surface-dim": "#cbdbf5"
+          },
+          borderRadius: {
+            DEFAULT: "0.125rem", lg: "0.25rem", xl: "0.5rem", full: "0.75rem"
+          },
+          spacing: {
+            "space-xs": "0.25rem",
+            "margin":   "1rem",
+            "space-md": "0.75rem",
+            "space-lg": "1rem",
+            "space-xl": "1.5rem",
+            "gutter":   "0.75rem",
+            "space-sm": "0.375rem"
+          },
+          fontFamily: {
+            "label-caps":       ["Geist"],
+            "headline-lg":      ["Geist"],
+            "body-lg":          ["Geist"],
+            "headline-md":      ["Geist"],
+            "headline-xl":      ["Geist"],
+            "code-sm":          ["JetBrains Mono"],
+            "numeric-table":    ["JetBrains Mono"],
+            "body-md":          ["Geist"],
+            "body-sm":          ["Geist"],
+            "numeric-metric-md":["JetBrains Mono"],
+            "numeric-metric-lg":["JetBrains Mono"]
+          },
+          fontSize: {
+            "label-caps":        ["11px",{"lineHeight":"14px","letterSpacing":"0.04em","fontWeight":"600"}],
+            "headline-lg":       ["22px",{"lineHeight":"28px","letterSpacing":"-0.015em","fontWeight":"600"}],
+            "body-lg":           ["14px",{"lineHeight":"20px","letterSpacing":"-0.005em","fontWeight":"400"}],
+            "headline-md":       ["16px",{"lineHeight":"22px","letterSpacing":"-0.01em","fontWeight":"600"}],
+            "headline-xl":       ["28px",{"lineHeight":"34px","letterSpacing":"-0.02em","fontWeight":"600"}],
+            "code-sm":           ["11px",{"lineHeight":"14px","letterSpacing":"0em","fontWeight":"400"}],
+            "numeric-table":     ["12px",{"lineHeight":"16px","letterSpacing":"0em","fontWeight":"400"}],
+            "body-md":           ["13px",{"lineHeight":"18px","letterSpacing":"0em","fontWeight":"400"}],
+            "body-sm":           ["12px",{"lineHeight":"16px","letterSpacing":"0em","fontWeight":"400"}],
+            "numeric-metric-md": ["14px",{"lineHeight":"18px","letterSpacing":"-0.01em","fontWeight":"500"}],
+            "numeric-metric-lg": ["24px",{"lineHeight":"28px","letterSpacing":"-0.02em","fontWeight":"600"}]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-background font-body-md text-on-surface antialiased">
+
+<!-- ── Sidebar ──────────────────────────────────────────────────────────────── -->
+<aside class="fixed left-0 top-0 h-screen w-[240px] bg-surface-container-lowest border-r border-outline-variant z-30 flex flex-col justify-between select-none">
+  <div class="flex flex-col">
+    <!-- Logo -->
+    <div class="h-14 flex items-center px-space-lg border-b border-outline-variant">
+      <div class="flex items-center gap-space-xs">
+        <span class="font-headline-md text-headline-md text-on-surface tracking-tight">BudgetIQ</span>
+        <span class="w-1.5 h-1.5 rounded-full bg-primary-container mt-1"></span>
+      </div>
+    </div>
+    <!-- Workspace label -->
+    <div class="px-space-md py-space-sm">
+      <span class="font-label-caps text-label-caps uppercase text-outline px-space-sm py-space-xs block">Workspace</span>
+    </div>
+    <!-- Nav -->
+    <nav class="flex flex-col">
+      <a aria-current="page"
+         class="flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
+         href="dashboard.html">
+        <span class="material-symbols-outlined text-[18px]">space_dashboard</span>
+        <span>Dashboard</span>
+      </a>
+      <a class="flex items-center gap-space-md px-space-lg py-space-sm font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low transition-colors duration-150"
+         href="#">
+        <span class="material-symbols-outlined text-[18px]">insights</span>
+        <span>Recommendations</span>
+      </a>
+      <a class="flex items-center gap-space-md px-space-lg py-space-sm font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low transition-colors duration-150"
+         href="approvals.html">
+        <span class="material-symbols-outlined text-[18px]">task_alt</span>
+        <span>Approvals</span>
+      </a>
+      <a class="flex items-center gap-space-md px-space-lg py-space-sm font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low transition-colors duration-150"
+         href="#">
+        <span class="material-symbols-outlined text-[18px]">table_chart</span>
+        <span>Reports</span>
+      </a>
+      <a class="flex items-center gap-space-md px-space-lg py-space-sm font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low transition-colors duration-150"
+         href="#">
+        <span class="material-symbols-outlined text-[18px]">tune</span>
+        <span>Settings</span>
+      </a>
+    </nav>
+  </div>
+  <!-- Footer status -->
+  <div class="p-space-md border-t border-outline-variant">
+    <div class="flex items-center justify-between px-space-sm py-space-xs text-outline">
+      <span class="font-code-sm text-code-sm uppercase">FY25 Q3 Active</span>
+      <span class="w-2 h-2 rounded-full bg-secondary-container"></span>
+    </div>
+  </div>
+</aside>
+
+<!-- ── Main shell ────────────────────────────────────────────────────────────── -->
+<div class="pl-[240px]">
+
+  <!-- Top header -->
+  <header class="fixed top-0 left-[240px] right-0 h-14 bg-surface-container-lowest border-b border-outline-variant z-20 flex items-center justify-between px-space-xl">
+    <div class="flex items-center gap-space-md">
+      <span class="material-symbols-outlined text-outline text-[20px]">account_balance</span>
+      <span class="font-code-sm text-code-sm uppercase text-outline">FP&amp;A Ledger Engine</span>
+    </div>
+    <div class="flex items-center gap-space-lg">
+      <div class="hidden md:flex flex-col text-right">
+        <span class="font-body-md text-body-md font-semibold text-on-surface leading-none">Alex Rivera</span>
+        <span class="font-code-sm text-code-sm text-outline mt-0.5">VP Finance · Core Ops</span>
+      </div>
+      <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+        <span class="material-symbols-outlined text-on-primary text-[18px]">person</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Page content ─────────────────────────────────────────────────────── -->
+  <main class="w-full pt-14 bg-background min-h-screen px-space-xl py-space-xl">
+    <div class="flex flex-col w-full gap-space-xl">
+
+      <!-- ── Top Meta & Quick Filters ─────────────────────────────────────── -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+        <div class="flex flex-col gap-0.5">
+          <div class="flex items-center gap-space-sm">
+            <span class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Executive Portfolio Ledger</span>
+            <span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-code-sm text-code-sm uppercase">Q2 Live Sync</span>
+          </div>
+          <p class="font-body-sm text-body-sm text-outline">Real-time ledger audit trail across 14 global operating units.</p>
+        </div>
+        <div class="flex items-center gap-space-sm">
+          <div class="flex items-center bg-surface-container-lowest px-space-md py-1 rounded shadow-sm gap-space-xs text-outline">
+            <span class="material-symbols-outlined text-[16px]">calendar_today</span>
+            <span class="font-code-sm text-code-sm text-on-surface">FY25 · Apr 01 – Jun 30</span>
+          </div>
+          <button class="flex items-center gap-space-xs px-space-md py-1 bg-surface-container-lowest text-on-surface hover:bg-surface-container-low font-body-sm text-body-sm rounded shadow-sm transition-colors duration-150">
+            <span class="material-symbols-outlined text-[16px] text-outline">tune</span>
+            <span>Filter Scenarios</span>
+          </button>
+          <button class="flex items-center gap-space-xs px-space-md py-1 bg-primary-container hover:bg-primary text-on-primary font-body-sm text-body-sm font-medium rounded shadow-sm transition-colors duration-150">
+            <span class="material-symbols-outlined text-[16px]">file_download</span>
+            <span>Export CSV</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Metric Bento Cards ────────────────────────────────────────────── -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-space-lg">
+
+        <!-- Card 1: Total Allocated -->
+        <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col justify-between">
+          <div class="flex items-start justify-between">
+            <span class="font-label-caps text-label-caps uppercase text-outline">Total Allocated Budget</span>
+            <span class="material-symbols-outlined text-outline text-[18px]">account_balance_wallet</span>
+          </div>
+          <div class="my-space-md flex flex-col">
+            <div class="flex items-baseline gap-space-xs">
+              <span class="font-numeric-metric-lg text-numeric-metric-lg text-on-surface tracking-tight font-semibold">$24,850,000</span>
+              <span class="font-code-sm text-code-sm text-outline">USD</span>
+            </div>
+            <div class="flex items-center gap-space-xs mt-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">Across 14 enterprise cost centers</span>
+            </div>
+          </div>
+          <div class="pt-space-sm flex items-center justify-between">
+            <span class="font-code-sm text-code-sm text-outline">Target Cap: $25.0M</span>
+            <span class="font-code-sm text-code-sm text-primary font-medium">99.4% Utilized</span>
+          </div>
+        </div>
+
+        <!-- Card 2: Flagged Anomalies -->
+        <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col justify-between">
+          <div class="flex items-start justify-between">
+            <span class="font-label-caps text-label-caps uppercase text-secondary">Flagged Anomalies</span>
+            <span class="material-symbols-outlined text-secondary text-[20px]">warning</span>
+          </div>
+          <div class="my-space-md flex flex-col">
+            <div class="flex items-baseline gap-space-sm">
+              <span class="font-numeric-metric-lg text-numeric-metric-lg text-secondary font-bold">3</span>
+              <span class="font-label-caps text-label-caps text-secondary uppercase px-1.5 py-0.5 bg-secondary-fixed rounded">Threshold Breach</span>
+            </div>
+            <div class="flex items-center gap-space-xs mt-1">
+              <span class="w-2 h-2 rounded-full bg-secondary-container animate-pulse"></span>
+              <span class="font-body-sm text-body-sm text-secondary font-medium">Spend spike detected</span>
+            </div>
+          </div>
+          <div class="pt-space-sm flex items-center justify-between">
+            <span class="font-code-sm text-code-sm text-outline">Overrun delta: +$504,000</span>
+            <span class="font-code-sm text-code-sm text-secondary font-medium underline cursor-pointer">Review Alert Stack</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Pending Reallocations -->
+        <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col justify-between">
+          <div class="flex items-start justify-between">
+            <span class="font-label-caps text-label-caps uppercase text-outline">Pending Reallocations</span>
+            <span class="material-symbols-outlined text-primary-container text-[18px]">verified_user</span>
+          </div>
+          <div class="my-space-md flex flex-col">
+            <div class="flex items-baseline gap-space-sm">
+              <span class="font-numeric-metric-lg text-numeric-metric-lg text-primary-container font-bold">7</span>
+              <span class="font-code-sm text-code-sm text-primary-container px-1.5 py-0.5 bg-surface-container-high rounded font-medium">Stage 2 Routing</span>
+            </div>
+            <div class="flex items-center gap-space-xs mt-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">Awaiting your review</span>
+            </div>
+          </div>
+          <div class="pt-space-sm flex items-center justify-between">
+            <span class="font-code-sm text-code-sm text-outline">Avg Latency: 1.4 days</span>
+            <span class="font-code-sm text-code-sm text-primary-container font-medium hover:underline cursor-pointer">Approve Batch →</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Budget Lines Table ─────────────────────────────────────────────── -->
+      <div class="bg-surface-container-lowest rounded shadow-sm flex flex-col overflow-hidden">
+
+        <!-- Table header panel -->
+        <div class="p-space-lg bg-surface-container-lowest flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+          <div class="flex flex-col gap-0.5">
+            <div class="flex items-center gap-space-sm">
+              <span class="font-headline-md text-headline-md text-on-surface">Budget Lines</span>
+              <span class="px-2 py-0.5 rounded bg-surface-container-low text-outline font-code-sm text-code-sm">5 Active Feeds</span>
+            </div>
+            <span class="font-body-sm text-body-sm text-outline">Fiscal Year 2025 · Q2 Department Breakdown</span>
+          </div>
+          <!-- Segmented filter chips -->
+          <div class="flex items-center gap-space-xs bg-surface-container-low p-0.5 rounded">
+            <button class="px-space-md py-1 rounded bg-surface-container-lowest shadow-sm font-body-sm text-body-sm font-medium text-on-surface">All Departments</button>
+            <button class="px-space-md py-1 rounded text-outline hover:text-on-surface font-body-sm text-body-sm transition-colors">Over-allocated</button>
+            <button class="px-space-md py-1 rounded text-outline hover:text-on-surface font-body-sm text-body-sm transition-colors">Variance &gt; 5%</button>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="w-full overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-surface-container-low text-outline">
+                <th class="py-2.5 px-space-lg font-label-caps text-label-caps uppercase tracking-wider">Department</th>
+                <th class="py-2.5 px-space-lg font-label-caps text-label-caps uppercase tracking-wider">Line Item</th>
+                <th class="py-2.5 px-space-lg font-label-caps text-label-caps uppercase tracking-wider text-right">Allocated</th>
+                <th class="py-2.5 px-space-lg font-label-caps text-label-caps uppercase tracking-wider">Spent %</th>
+                <th class="py-2.5 px-space-lg font-label-caps text-label-caps uppercase tracking-wider text-center">Status</th>
+                <th class="py-2.5 px-space-lg font-label-caps text-label-caps uppercase tracking-wider text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-outline-variant">
+
+              <!-- Row 1: FLAGGED — Marketing (anomaly) -->
+              <tr class="bg-secondary-fixed/40 hover:bg-secondary-fixed/60 transition-colors duration-100">
+                <td class="py-3 px-space-lg font-body-md text-body-md font-semibold text-on-surface">
+                  <div class="flex items-center gap-space-xs">
+                    <span class="w-2 h-2 rounded-full bg-secondary-container"></span>
+                    <span>Marketing</span>
+                  </div>
+                </td>
+                <td class="py-3 px-space-lg font-body-md text-body-md text-on-surface font-medium">
+                  Regional Events &amp; Field Activations
+                </td>
+                <td class="py-3 px-space-lg font-numeric-table text-numeric-table text-right font-medium text-on-surface">
+                  $1,200,000
+                </td>
+                <td class="py-3 px-space-lg min-w-[170px]">
+                  <div class="flex items-center gap-space-sm">
+                    <div class="w-24 h-2 bg-secondary-fixed rounded overflow-hidden">
+                      <div class="h-full bg-secondary-container rounded" style="width:100%"></div>
+                    </div>
+                    <span class="font-numeric-table text-numeric-table font-semibold text-secondary">142%</span>
+                  </div>
+                </td>
+                <td class="py-3 px-space-lg text-center">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary-fixed text-secondary font-code-sm text-code-sm font-semibold">
+                    <span class="material-symbols-outlined text-[13px]">emergency_home</span>
+                    <span>Spend Spike</span>
+                  </span>
+                </td>
+                <td class="py-3 px-space-lg text-right">
+                  <button class="inline-flex items-center gap-1 bg-primary-container hover:bg-primary text-on-primary px-3 py-1.5 rounded font-body-sm text-body-sm font-medium shadow-sm transition-colors duration-150">
+                    <span>View Details</span>
+                    <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+                  </button>
+                </td>
+              </tr>
+
+              <!-- Row 2: Engineering -->
+              <tr class="bg-surface-container-lowest hover:bg-surface-container-low transition-colors duration-100">
+                <td class="py-3 px-space-lg font-body-md text-body-md text-on-surface font-medium">Engineering</td>
+                <td class="py-3 px-space-lg font-body-md text-body-md text-on-surface-variant">Cloud Infrastructure &amp; Compute</td>
+                <td class="py-3 px-space-lg font-numeric-table text-numeric-table text-right text-on-surface font-medium">$8,450,000</td>
+                <td class="py-3 px-space-lg min-w-[170px]">
+                  <div class="flex items-center gap-space-sm">
+                    <div class="w-24 h-2 bg-surface-container-high rounded overflow-hidden">
+                      <div class="h-full bg-tertiary-container rounded" style="width:78%"></div>
+                    </div>
+                    <span class="font-numeric-table text-numeric-table text-outline font-medium">78%</span>
+                  </div>
+                </td>
+                <td class="py-3 px-space-lg text-center">
+                  <span class="inline-block px-2 py-0.5 rounded bg-surface-container text-tertiary font-code-sm text-code-sm">Normal</span>
+                </td>
+                <td class="py-3 px-space-lg text-right">
+                  <a class="font-body-sm text-body-sm text-outline hover:text-on-surface font-medium transition-colors" href="#">View</a>
+                </td>
+              </tr>
+
+              <!-- Row 3: Sales -->
+              <tr class="bg-surface-container-lowest hover:bg-surface-container-low transition-colors duration-100">
+                <td class="py-3 px-space-lg font-body-md text-body-md text-on-surface font-medium">Sales</td>
+                <td class="py-3 px-space-lg font-body-md text-body-md text-on-surface-variant">Global Incentive Compensation</td>
+                <td class="py-3 px-space-lg font-numeric-table text-numeric-table text-right text-on-surface font-medium">$4,100,000</td>
+                <td class="py-3 px-space-lg min-w-[170px]">
+                  <div class="flex items-center gap-space-sm">
+                    <div class="w-24 h-2 bg-surface-container-high rounded overflow-hidden">
+                      <div class="h-full bg-tertiary-container rounded" style="width:84%"></div>
+                    </div>
+                    <span class="font-numeric-table text-numeric-table text-outline font-medium">84%</span>
+                  </div>
+                </td>
+                <td class="py-3 px-space-lg text-center">
+                  <span class="inline-block px-2 py-0.5 rounded bg-surface-container text-tertiary font-code-sm text-code-sm">Normal</span>
+                </td>
+                <td class="py-3 px-space-lg text-right">
+                  <a class="font-body-sm text-body-sm text-outline hover:text-on-surface font-medium transition-colors" href="#">View</a>
+                </td>
+              </tr>
+
+              <!-- Row 4: Product -->
+              <tr class="bg-surface-container-lowest hover:bg-surface-container-low transition-colors duration-100">
+                <td class="py-3 px-space-lg font-body-md text-body-md text-on-surface font-medium">Product</td>
+                <td class="py-3 px-space-lg font-body-md text-body-md text-on-surface-variant">User Research &amp; Prototyping</td>
+                <td class="py-3 px-space-lg font-numeric-table text-numeric-table text-right text-on-surface font-medium">$650,000</td>
+                <td class="py-3 px-space-lg min-w-[170px]">
+                  <div class="flex items-center gap-space-sm">
+                    <div class="w-24 h-2 bg-surface-container-high rounded overflow-hidden">
+                      <div class="h-full bg-tertiary-container rounded" style="width:62%"></div>
+                    </div>
+                    <span class="font-numeric-table text-numeric-table text-outline font-medium">62%</span>
+                  </div>
+                </td>
+                <td class="py-3 px-space-lg text-center">
+                  <span class="inline-block px-2 py-0.5 rounded bg-surface-container text-tertiary font-code-sm text-code-sm">Normal</span>
+                </td>
+                <td class="py-3 px-space-lg text-right">
+                  <a class="font-body-sm text-body-sm text-outline hover:text-on-surface font-medium transition-colors" href="#">View</a>
+                </td>
+              </tr>
+
+              <!-- Row 5: Operations -->
+              <tr class="bg-surface-container-lowest hover:bg-surface-container-low transition-colors duration-100">
+                <td class="py-3 px-space-lg font-body-md text-body-md text-on-surface font-medium">Operations</td>
+                <td class="py-3 px-space-lg font-body-md text-body-md text-on-surface-variant">Workplace Facilities &amp; Logistics</td>
+                <td class="py-3 px-space-lg font-numeric-table text-numeric-table text-right text-on-surface font-medium">$1,850,000</td>
+                <td class="py-3 px-space-lg min-w-[170px]">
+                  <div class="flex items-center gap-space-sm">
+                    <div class="w-24 h-2 bg-surface-container-high rounded overflow-hidden">
+                      <div class="h-full bg-tertiary-container rounded" style="width:71%"></div>
+                    </div>
+                    <span class="font-numeric-table text-numeric-table text-outline font-medium">71%</span>
+                  </div>
+                </td>
+                <td class="py-3 px-space-lg text-center">
+                  <span class="inline-block px-2 py-0.5 rounded bg-surface-container text-tertiary font-code-sm text-code-sm">Normal</span>
+                </td>
+                <td class="py-3 px-space-lg text-right">
+                  <a class="font-body-sm text-body-sm text-outline hover:text-on-surface font-medium transition-colors" href="#">View</a>
+                </td>
+              </tr>
+
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination footer -->
+        <div class="px-space-lg py-space-md bg-surface-container-lowest flex items-center justify-between">
+          <span class="font-code-sm text-code-sm text-outline">Displaying 1–5 of 32 total ledger lines</span>
+          <div class="flex items-center gap-space-sm">
+            <button class="px-space-md py-1 rounded bg-surface-container-low text-outline font-body-sm text-body-sm hover:text-on-surface transition-colors" disabled>Previous</button>
+            <span class="font-code-sm text-code-sm font-medium text-on-surface">Page 1 / 7</span>
+            <button class="px-space-md py-1 rounded bg-surface-container-low text-on-surface font-body-sm text-body-sm hover:bg-surface-container transition-colors">Next</button>
+          </div>
+        </div>
+      </div><!-- /budget lines -->
+
+      <!-- ── Bottom Row: Burn Velocity + Governance ────────────────────────── -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-space-lg">
+
+        <!-- Forecasted Burn Velocity mini-chart -->
+        <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col justify-between">
+          <div class="flex items-center justify-between mb-space-sm">
+            <span class="font-headline-md text-headline-md text-on-surface">Forecasted Burn Velocity</span>
+            <span class="font-code-sm text-code-sm text-outline">P95 Confidence Window</span>
+          </div>
+          <p class="font-body-sm text-body-sm text-on-surface-variant mb-space-md">
+            Current pace projects Q2 close at $25,354,000 (+1.4% above maximum board authorization threshold).
+          </p>
+          <!-- Bar chart (CSS-only) -->
+          <div class="w-full h-16 flex items-end gap-1.5 px-2 py-1 bg-surface-container-low rounded">
+            <div class="w-full bg-surface-container-high h-[40%] rounded-t" title="Apr W1"></div>
+            <div class="w-full bg-surface-container-high h-[45%] rounded-t" title="Apr W2"></div>
+            <div class="w-full bg-surface-container-high h-[52%] rounded-t" title="Apr W3"></div>
+            <div class="w-full bg-surface-container-high h-[50%] rounded-t" title="Apr W4"></div>
+            <div class="w-full bg-surface-container-high h-[60%] rounded-t" title="May W1"></div>
+            <div class="w-full bg-surface-container-high h-[68%] rounded-t" title="May W2"></div>
+            <div class="w-full bg-surface-container-high h-[75%] rounded-t" title="May W3"></div>
+            <div class="w-full bg-secondary-container  h-[92%] rounded-t" title="May W4 — Outlier Surge"></div>
+            <div class="w-full bg-primary-container    h-[82%] rounded-t" title="Jun W1 (Est)"></div>
+            <div class="w-full bg-primary-container/40 h-[78%] rounded-t" title="Jun W2 (Est)"></div>
+          </div>
+          <div class="flex justify-between items-center mt-2 font-code-sm text-code-sm text-outline">
+            <span>Apr 01</span>
+            <span class="text-secondary font-medium">May W4 Spike (+42%)</span>
+            <span>Jun 30</span>
+          </div>
+        </div>
+
+        <!-- Automated Governance Check -->
+        <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col justify-between">
+          <div class="flex items-center justify-between mb-space-sm">
+            <span class="font-headline-md text-headline-md text-on-surface">Automated Governance Check</span>
+            <span class="px-2 py-0.5 rounded bg-surface-container text-tertiary font-code-sm text-code-sm uppercase">Strict Policy v4.2</span>
+          </div>
+          <div class="flex flex-col gap-space-sm">
+            <!-- Alert: action needed -->
+            <div class="flex items-start gap-space-sm p-space-sm rounded bg-surface-container-low">
+              <span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">notification_important</span>
+              <div class="flex flex-col">
+                <span class="font-body-md text-body-md font-semibold text-on-surface">Marketing Field Spend requires EVP Counter-Sign</span>
+                <span class="font-body-sm text-body-sm text-outline">Single invoice exceeded $250k single-day wire policy constraint on May 24th.</span>
+              </div>
+            </div>
+            <!-- Alert: cleared -->
+            <div class="flex items-start gap-space-sm p-space-sm rounded bg-surface-container-low">
+              <span class="material-symbols-outlined text-primary-container text-[18px] mt-0.5">check_circle</span>
+              <div class="flex flex-col">
+                <span class="font-body-md text-body-md font-semibold text-on-surface">Engineering Compute Reserve cleared automatically</span>
+                <span class="font-body-sm text-body-sm text-outline">Reserved instance allocation fell within standard 80% tolerance window.</span>
+              </div>
+            </div>
+          </div>
+          <div class="mt-space-sm pt-space-sm flex justify-end">
+            <span class="font-code-sm text-code-sm text-primary-container font-medium hover:underline cursor-pointer">Open Full System Ledger →</span>
+          </div>
+        </div>
+
+      </div><!-- /bottom row -->
+
+    </div>
+  </main>
+</div>
+
+</body>
+</html>
