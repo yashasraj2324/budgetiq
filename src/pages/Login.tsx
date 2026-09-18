@@ -1,7 +1,23 @@
 import { Link, useNavigate } from "react-router-dom";
+import { FormEvent, useState } from "react";
 
 export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [password, setPassword] = useState("");
   const navigate = useNavigate();
+
+  const signIn = (event: FormEvent) => {
+    event.preventDefault();
+    // Local development authentication; email and password are not sent.
+    if (!email) {
+      setError("Enter your work email to continue.");
+      return;
+    }
+    sessionStorage.setItem("budgetiq_access_token", `dev_${Date.now()}`);
+    if (email) sessionStorage.setItem("budgetiq_actor_name", email.split("@")[0]);
+    navigate("/dashboard");
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-space-lg">
@@ -18,16 +34,21 @@ export default function LoginPage() {
           <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
             Enterprise FP&amp;A Ledger Engine
           </p>
+          <p className="mt-2 text-xs text-amber-700">
+            Local development authentication; email and password are not sent.
+          </p>
         </div>
 
         {/* Login Form */}
-        <form className="space-y-space-lg" onSubmit={(e) => e.preventDefault()}>
+        <form className="space-y-space-lg" onSubmit={signIn}>
           <div className="space-y-1">
             <label className="block font-body-sm text-body-sm font-semibold text-on-surface">
               Work Email
             </label>
             <input
               type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full h-10 px-space-md bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container transition-colors focus:outline-none focus:border-primary-container font-body-md text-on-surface"
               placeholder="alex.rivera@company.com"
               required
@@ -39,12 +60,14 @@ export default function LoginPage() {
               <label className="block font-body-sm text-body-sm font-semibold text-on-surface">
                 Password
               </label>
-              <Link to="#" className="font-code-sm text-code-sm text-primary hover:underline">
+              <Link to="/reset-password" className="font-code-sm text-code-sm text-primary hover:underline">
                 Forgot password?
               </Link>
             </div>
             <input
               type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="w-full h-10 px-space-md bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container transition-colors focus:outline-none focus:border-primary-container font-body-md text-on-surface"
               placeholder="••••••••"
               required
@@ -56,28 +79,27 @@ export default function LoginPage() {
               type="checkbox"
               id="remember"
               className="w-4 h-4 rounded border-outline-variant text-primary-container focus:ring-primary-container"
+              onChange={(event) => {
+                if (event.target.checked) {
+                  localStorage.setItem("budgetiq_remember_session", "true");
+                } else {
+                  localStorage.removeItem("budgetiq_remember_session");
+                }
+              }}
             />
             <label htmlFor="remember" className="font-body-sm text-body-sm text-on-surface-variant cursor-pointer">
               Remember me for 30 days
             </label>
           </div>
 
-          <div
+          <button
             className="w-full h-10 bg-primary-container hover:bg-primary active:bg-on-primary-fixed-variant text-on-primary font-body-md text-body-md font-semibold rounded shadow-sm transition-colors duration-150 flex items-center justify-center gap-space-xs mt-space-md cursor-pointer"
-            onClick={() => {
-              const emailInput = document.querySelector('input[type="email"]') as HTMLInputElement;
-              if (emailInput && emailInput.value) {
-                // simple name extraction from email
-                const nameParts = emailInput.value.split("@")[0].split(".");
-                const name = nameParts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
-                localStorage.setItem("actor_name", name);
-              }
-              navigate("/onboarding");
-            }}
+            type="submit"
           >
             <span>Sign In</span>
             <span className="material-symbols-outlined text-[18px]">login</span>
-          </div>
+          </button>
+          {error && <p className="text-sm text-error" role="alert">{error}</p>}
         </form>
 
         {/* Footer */}

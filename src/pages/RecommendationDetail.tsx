@@ -1,16 +1,23 @@
-import { Shell } from "@/components/Shell";
+import { Shell } from "../components/Shell";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-
-const API = "http://localhost:8000/api";
+import { API, apiFetch } from "../lib/api";
 
 const formatINR = (val: number) =>
   "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
+interface Recommendation {
+  id: number;
+  amount: number;
+  status: string;
+  confidence: number;
+  rationale_json: { recommendation?: string; reasoning_steps?: { step: number; label: string; detail: string }[]; rejection_consequence?: string };
+}
+
 export default function RecommendationDetailPage() {
   const params = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [rec, setRec] = useState<any>(null);
+  const [rec, setRec] = useState<Recommendation | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
@@ -21,7 +28,7 @@ export default function RecommendationDetailPage() {
   const [modifyError, setModifyError] = useState("");
 
   useEffect(() => {
-    fetch(`${API}/recommendations/${params.id}`)
+    apiFetch(`${API}/recommendations/${params.id}`)
       .then((r) => r.json())
       .then((d) => { setRec(d); setLoading(false); });
   }, [params.id]);
@@ -30,7 +37,7 @@ export default function RecommendationDetailPage() {
     setActionLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API}/recommendations/${params.id}/${action}`, {
+      const res = await apiFetch(`${API}/recommendations/${params.id}/${action}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ actor: "VP Finance" }),
@@ -55,7 +62,7 @@ export default function RecommendationDetailPage() {
 
     setActionLoading(true);
     try {
-      const res = await fetch(`${API}/recommendations/${params.id}/modify`, {
+      const res = await apiFetch(`${API}/recommendations/${params.id}/modify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount, actor: "VP Finance" }),

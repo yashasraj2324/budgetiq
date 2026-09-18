@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { API, apiFetch } from "@/lib/api";
 
 interface SpendEntry {
   name: string;
@@ -8,28 +9,25 @@ interface SpendEntry {
   anomaly: boolean;
   projected: boolean;
 }
+interface ForecastPoint { period?: string; amount: number; projected?: boolean; }
+interface ForecastResponse { points?: ForecastPoint[]; }
 
 export function RechartsChart() {
   const [data, setData] = useState<SpendEntry[]>([]);
 
   useEffect(() => {
-    // Attempt to fetch spend for Regional Events
-    // Note: If ID 2 is not found, fallback to an empty array before pushing mock projected weeks.
-    fetch("http://localhost:8000/api/budget-lines/2/spend")
+    apiFetch(`${API}/budget-lines/2/forecast?horizon=4`)
       .then(r => r.json())
-      .then((d: any) => {
-        const safeData = Array.isArray(d) ? d : [];
-        // Add projected weeks for visual completeness
-        safeData.push({ name: "W10", spend: 1100000, projected: true, anomaly: false });
-        safeData.push({ name: "W11", spend: 1150000, projected: true, anomaly: false });
-        setData(safeData);
+      .then((d: ForecastResponse) => {
+        const points = Array.isArray(d?.points) ? d.points : [];
+        setData(points.map((p) => ({
+          name: p.period?.split("-").pop() ?? "Period",
+          spend: p.amount,
+          projected: p.projected !== false,
+          anomaly: false,
+        })));
       })
-      .catch(() => {
-        setData([
-          { name: "W10", spend: 1100000, projected: true, anomaly: false },
-          { name: "W11", spend: 1150000, projected: true, anomaly: false }
-        ]);
-      });
+      .catch(() => setData([]));
   }, []);
 
   return (

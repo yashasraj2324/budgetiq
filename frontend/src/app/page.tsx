@@ -1,7 +1,48 @@
 "use client";
 import Link from "next/link";
+import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const authMode = (process.env.NEXT_PUBLIC_AUTH_MODE ?? "dev").toLowerCase();
+  const devToken = process.env.NEXT_PUBLIC_DEV_AUTH_TOKEN ?? "";
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [password, setPassword] = useState("");
+  const router = useRouter();
+
+  const signIn = async (event: FormEvent) => {
+    event.preventDefault();
+    if (authMode === "dev") {
+      if (!devToken) {
+      setError("Development auth is not configured. Set NEXT_PUBLIC_DEV_AUTH_TOKEN.");
+      return;
+      }
+      sessionStorage.setItem("budgetiq_access_token", devToken);
+    } else {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!url || !anonKey) {
+        setError("Supabase authentication is not configured.");
+        return;
+      }
+      const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: anonKey },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        setError(body.error_description ?? body.msg ?? "Sign-in failed.");
+        return;
+      }
+      const session = await response.json();
+      sessionStorage.setItem("budgetiq_access_token", session.access_token);
+    }
+    if (email) sessionStorage.setItem("budgetiq_actor_name", email.split("@")[0]);
+    router.push("/dashboard");
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-space-lg">
       <div className="w-full max-w-md bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-space-xl">
@@ -17,16 +58,23 @@ export default function LoginPage() {
           <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
             Enterprise FP&amp;A Ledger Engine
           </p>
+          {authMode === "dev" && (
+            <p className="mt-2 text-xs text-amber-700">
+              Local development authentication; email and password are not sent.
+            </p>
+          )}
         </div>
 
         {/* Login Form */}
-        <form className="space-y-space-lg" onSubmit={(e) => e.preventDefault()}>
+        <form className="space-y-space-lg" onSubmit={signIn}>
           <div className="space-y-1">
             <label className="block font-body-sm text-body-sm font-semibold text-on-surface">
               Work Email
             </label>
             <input
               type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full h-10 px-space-md bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container transition-colors focus:outline-none focus:border-primary-container font-body-md text-on-surface"
               placeholder="alex.rivera@company.com"
               required
@@ -38,12 +86,14 @@ export default function LoginPage() {
               <label className="block font-body-sm text-body-sm font-semibold text-on-surface">
                 Password
               </label>
-              <Link href="#" className="font-code-sm text-code-sm text-primary hover:underline">
+              <Link href="/reset-password" className="font-code-sm text-code-sm text-primary hover:underline">
                 Forgot password?
               </Link>
             </div>
             <input
               type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="w-full h-10 px-space-md bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container transition-colors focus:outline-none focus:border-primary-container font-body-md text-on-surface"
               placeholder="••••••••"
               required
@@ -55,34 +105,33 @@ export default function LoginPage() {
               type="checkbox"
               id="remember"
               className="w-4 h-4 rounded border-outline-variant text-primary-container focus:ring-primary-container"
+              onChange={(event) => {
+                if (event.target.checked) {
+                  localStorage.setItem("budgetiq_remember_session", "true");
+                } else {
+                  localStorage.removeItem("budgetiq_remember_session");
+                }
+              }}
             />
             <label htmlFor="remember" className="font-body-sm text-body-sm text-on-surface-variant cursor-pointer">
               Remember me for 30 days
             </label>
           </div>
 
-          <div
+          <button
             className="w-full h-10 bg-primary-container hover:bg-primary active:bg-on-primary-fixed-variant text-on-primary font-body-md text-body-md font-semibold rounded shadow-sm transition-colors duration-150 flex items-center justify-center gap-space-xs mt-space-md cursor-pointer"
-            onClick={() => {
-              const emailInput = document.querySelector('input[type="email"]') as HTMLInputElement;
-              if (emailInput && emailInput.value) {
-                // simple name extraction from email
-                const nameParts = emailInput.value.split('@')[0].split('.');
-                const name = nameParts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
-                localStorage.setItem("actor_name", name);
-              }
-              window.location.href = "/onboarding";
-            }}
+            type="submit"
           >
             <span>Sign In</span>
             <span className="material-symbols-outlined text-[18px]">login</span>
-          </div>
+          </button>
+          {error && <p className="text-sm text-error" role="alert">{error}</p>}
         </form>
 
         {/* Footer */}
         <div className="mt-space-xl pt-space-md border-t border-outline-variant text-center">
           <p className="font-body-sm text-body-sm text-on-surface-variant">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/signup" className="text-primary font-semibold hover:underline">
               Request access
             </Link>

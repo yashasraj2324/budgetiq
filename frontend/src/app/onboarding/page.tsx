@@ -1,26 +1,23 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { API, apiFetch } from "@/lib/api";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [userName, setUserName] = useState("");
-  
-  useEffect(() => {
-    const stored = localStorage.getItem("actor_name");
-    if (stored) {
-      setUserName(`${stored.toLowerCase().replace(/\s+/g, ".")}@enterprise.com`);
-    }
-  }, []);
+  const [userName] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const stored = sessionStorage.getItem("budgetiq_actor_name");
+    return stored ? `${stored.toLowerCase().replace(/\s+/g, ".")}@enterprise.com` : "";
+  });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     const fd = new FormData(e.currentTarget);
     try {
-      await fetch("http://localhost:8000/api/onboarding/data", {
+      const response = await apiFetch(`${API}/onboarding/data`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -31,9 +28,13 @@ export default function OnboardingPage() {
           budget_lines: []
         })
       });
+      if (!response.ok) {
+        throw new Error("Workspace setup could not be saved.");
+      }
       router.push("/onboarding/data");
-    } catch {
-      router.push("/onboarding/data");
+    } catch (error) {
+      setLoading(false);
+      window.alert(error instanceof Error ? error.message : "Workspace setup could not be saved.");
     }
   };
 
@@ -59,7 +60,7 @@ export default function OnboardingPage() {
           </div>
           <div className="flex items-center space-x-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span className="font-medium text-slate-600">SOC-2 Type II Certified</span>
+            <span className="font-medium text-slate-600">Private beta security controls</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <span className="material-symbols-outlined text-[16px] text-slate-400">person</span>
@@ -148,7 +149,7 @@ export default function OnboardingPage() {
                 <div>
                   <h2 className="text-xs font-semibold text-slate-800 uppercase tracking-wide font-mono">Enterprise Isolation Model</h2>
                   <p className="mt-1 text-xs text-slate-500 leading-normal">
-                    Workspace initialization allocates a dedicated cryptographically signed decision tree. Multi-tiered approval chains remain uninitialized until Step 3.
+                    Workspace initialization saves organization details and establishes the tenant boundary for this deployment.
                   </p>
                 </div>
               </div>
@@ -158,11 +159,11 @@ export default function OnboardingPage() {
             <div className="mt-6 pl-1 space-y-2 text-xs text-slate-400">
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                <span>Next: Step 2 &middot; Connect / Import Financial Data (GL &amp; ERP mappings)</span>
+                <span>Next: Step 2 · Manual budget-line setup</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                <span>Followed by: Step 3 &middot; Configure Financial Policies (EnterPro routing DAG)</span>
+                <span>Followed by: Step 3 &middot; Configure Financial Policies</span>
               </div>
             </div>
           </div>
@@ -350,7 +351,7 @@ export default function OnboardingPage() {
                     <svg className="w-4 h-4 text-slate-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                     </svg>
-                    <span>Your financial data remains under your organization's control.</span>
+                    <span>Your financial data remains under your organization&apos;s control.</span>
                   </div>
                 </div>
 
@@ -367,12 +368,6 @@ export default function OnboardingPage() {
                     </svg>}
                   </button>
 
-                  <button
-                    type="button"
-                    className="order-2 sm:order-1 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors text-center sm:text-left py-1 cursor-pointer"
-                  >
-                    I'll set this up later
-                  </button>
                 </div>
               </form>
             </div>
@@ -387,7 +382,7 @@ export default function OnboardingPage() {
           <span>&middot;</span>
           <span>Deterministic Anomaly Engine</span>
           <span>&middot;</span>
-          <span>EnterPro Policy Orchestration Active</span>
+          <span>Data source: manual and CSV ingestion</span>
         </div>
         <div className="text-[11px] text-slate-400">
           &copy; 2025 BudgetIQ Systems Inc. All rights reserved.

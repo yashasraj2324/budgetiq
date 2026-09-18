@@ -2,8 +2,7 @@
 import { Shell } from "@/components/Shell";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-
-const API = "http://localhost:8000/api";
+import { API, apiFetch } from "@/lib/api";
 
 const formatINR = (val: number) =>
   "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
@@ -18,6 +17,7 @@ interface BudgetLine {
   necessary_future_spend: number;
   safety_reserve: number;
 }
+interface Recommendation { id: number; source_line_id: number; target_line_id: number; amount: number; status: string; confidence: number; rationale_json?: Record<string, unknown>; }
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -34,7 +34,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function RecommendationsPage() {
-  const [recs, setRecs] = useState<any[]>([]);
+  const [recs, setRecs] = useState<Recommendation[]>([]);
   const [lines, setLines] = useState<BudgetLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -46,8 +46,8 @@ export default function RecommendationsPage() {
 
   const loadData = () => {
     Promise.all([
-      fetch(`${API}/recommendations`).then(r => r.json()),
-      fetch(`${API}/budget-lines`).then(r => r.json()),
+      apiFetch(`${API}/recommendations`).then(r => r.json()),
+      apiFetch(`${API}/budget-lines`).then(r => r.json()),
     ]).then(([recData, lineData]) => {
       setRecs(recData);
       setLines(lineData);
@@ -68,7 +68,7 @@ export default function RecommendationsPage() {
     setGenError("");
     setGenerating(true);
 
-    const res = await fetch(`${API}/recommendations/generate`, {
+    const res = await apiFetch(`${API}/recommendations/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source_line_id: parseInt(sourceId), target_line_id: parseInt(targetId) }),

@@ -15,80 +15,20 @@ export default function SignupPage() {
           </div>
           <h1 className="font-headline-md text-headline-md text-on-surface">Request Access</h1>
           <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
-            Join your organization's Ledger Workspace
+            Join your organization&apos;s Ledger Workspace
           </p>
         </div>
 
-        {/* Signup Form */}
-        <form className="space-y-space-md" onSubmit={(e) => e.preventDefault()}>
-          <div className="grid grid-cols-2 gap-space-md">
-            <div className="space-y-1">
-              <label className="block font-body-sm text-body-sm font-semibold text-on-surface">
-                First Name
-              </label>
-              <input
-                type="text"
-                className="w-full h-10 px-space-md bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container transition-colors focus:outline-none focus:border-primary-container font-body-md text-on-surface"
-                placeholder="Alex"
-                required
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block font-body-sm text-body-sm font-semibold text-on-surface">
-                Last Name
-              </label>
-              <input
-                type="text"
-                className="w-full h-10 px-space-md bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container transition-colors focus:outline-none focus:border-primary-container font-body-md text-on-surface"
-                placeholder="Rivera"
-                required
-              />
-            </div>
+        <div className="space-y-space-md">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            Account provisioning is managed by your organization&apos;s
+            configured Supabase provider. This private-beta shell does not
+            create accounts or collect passwords.
           </div>
-
-          <div className="space-y-1">
-            <label className="block font-body-sm text-body-sm font-semibold text-on-surface">
-              Work Email
-            </label>
-            <input
-              type="email"
-              className="w-full h-10 px-space-md bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container transition-colors focus:outline-none focus:border-primary-container font-body-md text-on-surface"
-              placeholder="alex.rivera@company.com"
-              required
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="block font-body-sm text-body-sm font-semibold text-on-surface">
-              Department Code
-            </label>
-            <input
-              type="text"
-              className="w-full h-10 px-space-md bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container transition-colors focus:outline-none focus:border-primary-container font-body-md text-on-surface uppercase"
-              placeholder="e.g. MKT-7200"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="block font-body-sm text-body-sm font-semibold text-on-surface">
-              Password
-            </label>
-            <input
-              type="password"
-              className="w-full h-10 px-space-md bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container transition-colors focus:outline-none focus:border-primary-container font-body-md text-on-surface"
-              placeholder="Create a secure password"
-              required
-            />
-          </div>
-
-          <Link href="/onboarding" className="w-full">
-            <div
-              className="w-full h-10 bg-primary-container hover:bg-primary active:bg-on-primary-fixed-variant text-on-primary font-body-md text-body-md font-semibold rounded shadow-sm transition-colors duration-150 flex items-center justify-center gap-space-xs mt-space-lg"
-            >
-              <span>Submit Request</span>
-              <span className="material-symbols-outlined text-[18px]">person_add</span>
-            </div></Link>
-        </form>
+          <Link href="/" className="w-full h-10 bg-primary-container hover:bg-primary text-on-primary font-body-md font-semibold rounded flex items-center justify-center gap-space-xs mt-space-lg">
+            Return to sign in
+          </Link>
+        </div>
 
         {/* Footer */}
         <div className="mt-space-xl pt-space-md border-t border-outline-variant text-center">

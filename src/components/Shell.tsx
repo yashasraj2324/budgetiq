@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState } from "react";
 
 interface ShellProps {
   children: ReactNode;
@@ -7,13 +7,10 @@ interface ShellProps {
 }
 
 export function Shell({ children, activePath = "dashboard" }: ShellProps) {
-  const [userName, setUserName] = useState("");
-  const [userRole, setUserRole] = useState("");
-
-  useEffect(() => {
-    setUserName(localStorage.getItem("actor_name") || "Alex Rivera");
-    setUserRole(localStorage.getItem("actor_role") || "VP Finance");
-  }, []);
+  const [userName] = useState(
+    () => sessionStorage.getItem("budgetiq_actor_name") || "BudgetIQ user",
+  );
+  const [userRole] = useState("Local developer");
 
   return (
     <div className="flex h-screen w-full bg-background font-body-md text-on-surface antialiased overflow-hidden">
@@ -100,6 +97,17 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
               <span>Audit Log</span>
             </Link>
             <Link
+              to="/scenarios"
+              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+                activePath === "scenarios"
+                  ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
+                  : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">bookmarks</span>
+              <span>Scenarios</span>
+            </Link>
+            <Link
               to="/settings"
               className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
                 activePath === "settings"
@@ -109,6 +117,28 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
             >
               <span className="material-symbols-outlined text-[18px]">tune</span>
               <span>Settings</span>
+            </Link>
+            <Link
+              to="/governance"
+              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+                activePath === "governance"
+                  ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
+                  : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">gavel</span>
+              <span>Governance</span>
+            </Link>
+            <Link
+              to="/integrations"
+              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+                activePath === "integrations"
+                  ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
+                  : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">cable</span>
+              <span>Integrations</span>
             </Link>
           </nav>
         </div>
@@ -132,20 +162,8 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
           <div className="flex items-center gap-space-lg">
             <div className="hidden md:flex flex-col text-right">
               <span
-                className="font-body-md text-body-md font-semibold text-on-surface leading-none cursor-pointer hover:text-blue-600 transition-colors"
-                onClick={() => {
-                  const newName = prompt("Set user name:", userName);
-                  if (newName) {
-                    localStorage.setItem("actor_name", newName);
-                    setUserName(newName);
-                  }
-                  const newRole = prompt("Set user role (e.g. VP Finance, CFO):", userRole);
-                  if (newRole) {
-                    localStorage.setItem("actor_role", newRole);
-                    setUserRole(newRole);
-                  }
-                }}
-                title="Click to change user profile"
+                className="font-body-md text-body-md font-semibold text-on-surface leading-none"
+                title="Authenticated session"
               >
                 {userName}
               </span>

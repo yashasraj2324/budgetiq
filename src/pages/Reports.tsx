@@ -1,7 +1,6 @@
-import { Shell } from "@/components/Shell";
+import { Shell } from "../components/Shell";
 import { useState, useEffect } from "react";
-
-const API = "http://localhost:8000/api";
+import { API, apiFetch } from "../lib/api";
 
 const formatINR = (val: number) =>
   "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
@@ -22,11 +21,11 @@ interface AuditEvent {
   recommendation_id: number;
   action: string;
   actor: string;
-  event_metadata: Record<string, any>;
+  event_metadata: { amount?: number; modified_amount?: number; previous_source_budget?: number; new_source_budget?: number };
   timestamp: string;
 }
 
-function downloadCSV(rows: Record<string, any>[], filename: string) {
+function downloadCSV(rows: Record<string, string | number>[], filename: string) {
   if (!rows.length) return;
   const headers = Object.keys(rows[0]);
   const csv = [
@@ -58,8 +57,8 @@ export default function ReportsPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API}/budget-lines`).then((r) => r.json()),
-      fetch(`${API}/audit`).then((r) => r.json()),
+      apiFetch(`${API}/budget-lines`).then((r) => r.json()),
+      apiFetch(`${API}/audit`).then((r) => r.json()),
     ])
       .then(([lData, aData]) => {
         setLines(lData);
@@ -212,7 +211,7 @@ export default function ReportsPage() {
                 <tbody className="divide-y divide-outline-variant">
                   {audit.map((e) => {
                     const meta = e.event_metadata;
-                    const amount = meta.amount ?? meta.modified_amount ?? "—";
+                    const amount: number | string = meta.amount ?? meta.modified_amount ?? "—";
                     return (
                       <tr key={e.id} className="hover:bg-surface-container transition-colors duration-100">
                         <td className="py-3 px-space-lg font-code-sm text-outline">DEC-2025-{e.recommendation_id}</td>
@@ -227,7 +226,7 @@ export default function ReportsPage() {
                         </td>
                         <td className="py-3 px-space-lg font-numeric-table text-right text-outline text-xs">
                           {typeof meta.previous_source_budget === "number"
-                            ? `${formatINR(meta.previous_source_budget)} → ${formatINR(meta.new_source_budget)}`
+                            ? `${formatINR(meta.previous_source_budget)} → ${formatINR(meta.new_source_budget ?? 0)}`
                             : "—"}
                         </td>
                         <td className="py-3 px-space-lg font-code-sm text-on-surface-variant">

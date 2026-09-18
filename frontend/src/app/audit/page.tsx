@@ -1,8 +1,7 @@
 "use client";
 import { Shell } from "@/components/Shell";
 import { useState, useEffect } from "react";
-
-const API = "http://localhost:8000/api";
+import { API, apiFetch } from "@/lib/api";
 
 const formatINR = (val: number) =>
   "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
@@ -49,7 +48,7 @@ export default function AuditPage() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    fetch(`${API}/audit`)
+    apiFetch(`${API}/audit`)
       .then(r => r.json())
       .then(d => { setEvents(d); setLoading(false); })
       .catch(() => setLoading(false));

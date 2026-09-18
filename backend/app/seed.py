@@ -4,16 +4,29 @@ Seed the MongoDB with deterministic demo data matching the PRD narrative:
   - Money flows to the HIGH-priority target (Engineering → Platform R&D, priority 88)
   - A third department (Operations) provides variety in the selector UI
 """
-from datetime import datetime
-from .database import client, db
+import os
+from datetime import datetime, timezone
+from .database import db
 from .models import RecommendationStatus
 
+def seed() -> bool:
+    """Insert the demo fixture once, without ever deleting application data.
 
-def seed():
-    # Drop all collections
-    for coll in ["departments", "budget_lines", "spend_entries",
-                 "performance_scores", "recommendations", "audit_events"]:
-        db[coll].drop()
+    Seeding is opt-in because a production database must never receive demo
+    records on boot. Even when enabled, a partially populated database is left
+    untouched so startup cannot overwrite or mix tenants.
+    """
+    if os.getenv("BUDGETIQ_SEED_DEMO", "false").lower() not in {"1", "true", "yes"}:
+        return False
+
+    collections = ("departments", "budget_lines", "spend_entries",
+                   "performance_scores", "recommendations", "audit_events")
+    if any(db[name].find_one({}, {"_id": 1}) is not None for name in collections):
+        return False
+
+    # Read this at seed time so tests, CLI invocations, and process managers
+    # can configure the development tenant after importing this module.
+    demo_organization_id = os.getenv("BUDGETIQ_DEV_ORGANIZATION_ID", "local-demo")
 
     # -------------------------------------------------------------------------
     # Departments
@@ -21,7 +34,7 @@ def seed():
     d_eng = {"id": 1, "name": "Engineering", "priority_weight": 90}
     d_mkt = {"id": 2, "name": "Marketing",   "priority_weight": 45}
     d_ops = {"id": 3, "name": "Operations",  "priority_weight": 65}
-    db.departments.insert_many([d_eng, d_mkt, d_ops])
+    db.departments.insert_many([{**d, "organization_id": demo_organization_id} for d in [d_eng, d_mkt, d_ops]])
 
     # -------------------------------------------------------------------------
     # Budget lines
@@ -50,7 +63,7 @@ def seed():
         "necessary_future_spend": 600000.0, "safety_reserve": 80000.0,
         "policy_maximum_transfer": 500000.0,
     }
-    db.budget_lines.insert_many([l_rnd, l_events, l_devops])
+    db.budget_lines.insert_many([{**line, "organization_id": demo_organization_id} for line in [l_rnd, l_events, l_devops]])
 
     # -------------------------------------------------------------------------
     # Spend entries
@@ -83,16 +96,18 @@ def seed():
             "period": f"2025-W{w:02d}", "amount_spent": base_devops,
         })
 
-    db.spend_entries.insert_many(entries)
+    db.spend_entries.insert_many([{**entry, "organization_id": demo_organization_id} for entry in entries])
 
     # -------------------------------------------------------------------------
     # Performance scores
     # -------------------------------------------------------------------------
-    db.performance_scores.insert_many([
+    db.performance_scores.insert_many([{
+        **score, "organization_id": demo_organization_id
+    } for score in [
         {"id": 1, "budget_line_id": 1, "period": "2025-Q1", "score": 91.0, "metric_type": "composite"},
         {"id": 2, "budget_line_id": 2, "period": "2025-Q1", "score": 54.0, "metric_type": "composite"},
         {"id": 3, "budget_line_id": 3, "period": "2025-Q1", "score": 78.5, "metric_type": "composite"},
-    ])
+    ]])
 
     # -------------------------------------------------------------------------
     # Seed recommendation — source: Regional Events (id=2) → target: Platform R&D (id=1)
@@ -100,6 +115,7 @@ def seed():
     # -------------------------------------------------------------------------
     db.recommendations.insert_many([
         {
+            "organization_id": demo_organization_id,
             "id": 1,
             "source_line_id": 2,
             "target_line_id": 1,
@@ -132,12 +148,15 @@ def seed():
             },
             "status": RecommendationStatus.pending.value,
             "confidence": 0.91,
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc),
             "approved_at": None,
         }
     ])
+    return True
 
 
 if __name__ == "__main__":
-    seed()
-    print("MongoDB seeded with corrected PRD scenario.")
+    if seed():
+        print("MongoDB seeded with corrected PRD scenario.")
+    else:
+        print("Demo seed skipped (disabled or database is not empty).")

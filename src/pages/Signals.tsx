@@ -1,8 +1,7 @@
-import { Shell } from "@/components/Shell";
+import { Shell } from "../components/Shell";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-const API = "http://localhost:8000/api";
+import { API, apiFetch } from "../lib/api";
 
 const formatINR = (val: number) =>
   "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
@@ -45,8 +44,8 @@ export default function SignalsPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API}/anomalies`).then((r) => r.json()),
-      fetch(`${API}/budget-lines`).then((r) => r.json()),
+      apiFetch(`${API}/anomalies`).then((r) => r.json()),
+      apiFetch(`${API}/budget-lines`).then((r) => r.json()),
     ])
       .then(([aData, lData]) => {
         setSignals(aData);
@@ -73,7 +72,7 @@ export default function SignalsPage() {
     setGenError((prev) => ({ ...prev, [sourceId]: "" }));
 
     try {
-      const res = await fetch(`${API}/recommendations/generate`, {
+      const res = await apiFetch(`${API}/recommendations/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source_line_id: sourceId, target_line_id: targetId }),

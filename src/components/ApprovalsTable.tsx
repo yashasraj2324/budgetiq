@@ -1,12 +1,20 @@
 import { useState, useEffect } from "react";
-
-const API = "http://localhost:8000/api";
+import { API, apiFetch } from "../lib/api";
 
 const formatINR = (val: number) =>
   "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
 interface BudgetLine { id: number; name: string; }
 interface ReasoningStep { step: number; label: string; detail: string; }
+interface Recommendation {
+  id: number;
+  source_line_id: number;
+  target_line_id: number;
+  amount: number;
+  confidence: number;
+  status: string;
+  rationale_json?: { reasoning_steps?: ReasoningStep[]; rejection_consequence?: string };
+}
 
 const statusStyle: Record<string, string> = {
   approved: "bg-primary-container/20 text-primary",
@@ -15,8 +23,8 @@ const statusStyle: Record<string, string> = {
   pending:   "bg-surface-container-high text-on-surface-variant",
 };
 
-export function ApprovalsTable({ initialData = [] }: { initialData?: any[] }) {
-  const [data, setData] = useState<any[]>(initialData);
+export function ApprovalsTable({ initialData = [] }: { initialData?: Recommendation[] }) {
+  const [data, setData] = useState<Recommendation[]>(initialData);
   const [lines, setLines] = useState<BudgetLine[]>([]);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [modifyRowId, setModifyRowId] = useState<number | null>(null);
@@ -25,7 +33,7 @@ export function ApprovalsTable({ initialData = [] }: { initialData?: any[] }) {
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch(`${API}/budget-lines`)
+    apiFetch(`${API}/budget-lines`)
       .then((r) => r.json())
       .then((d: BudgetLine[]) => setLines(d))
       .catch(() => {});
@@ -34,16 +42,16 @@ export function ApprovalsTable({ initialData = [] }: { initialData?: any[] }) {
   const lineName = (id: number) => lines.find((l) => l.id === id)?.name ?? `Line #${id}`;
 
   const refresh = () => {
-    fetch(`${API}/recommendations`)
+    apiFetch(`${API}/recommendations`)
       .then((r) => r.json())
       .then((d) => setData(d))
-      .catch(() => window.location.reload());
+      .catch(() => {});
   };
 
   const handleAction = async (id: number, action: "approve" | "reject") => {
     setActionLoading(id);
     try {
-      const res = await fetch(`${API}/recommendations/${id}/${action}`, {
+      const res = await apiFetch(`${API}/recommendations/${id}/${action}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ actor: "VP Finance" }),
@@ -60,7 +68,7 @@ export function ApprovalsTable({ initialData = [] }: { initialData?: any[] }) {
     setActionLoading(null);
   };
 
-  const handleModify = async (id: number, recAmount: number) => {
+  const handleModify = async (id: number) => {
     const raw = modifyAmounts[id];
     const amount = parseFloat(raw);
     if (!amount || amount <= 0) {
@@ -69,7 +77,7 @@ export function ApprovalsTable({ initialData = [] }: { initialData?: any[] }) {
     }
     setActionLoading(id);
     try {
-      const res = await fetch(`${API}/recommendations/${id}/modify`, {
+      const res = await apiFetch(`${API}/recommendations/${id}/modify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount, actor: "VP Finance" }),
@@ -194,7 +202,7 @@ export function ApprovalsTable({ initialData = [] }: { initialData?: any[] }) {
                         )}
                         <div className="flex gap-space-xs">
                           <button
-                            onClick={() => handleModify(rec.id, rec.amount)}
+                            onClick={() => handleModify(rec.id)}
                             disabled={isLoading}
                             className="flex-1 py-1.5 bg-primary text-on-primary rounded font-body-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
                           >
