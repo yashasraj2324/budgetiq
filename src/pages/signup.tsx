@@ -48,7 +48,7 @@ export default function SignupPage() {
       if (body.access_token) {
         sessionStorage.setItem("budgetiq_access_token", body.access_token);
         sessionStorage.setItem("budgetiq_actor_name", email.split("@")[0]);
-        navigate("/dashboard");
+        navigate("/onboarding");
         return;
       }
       setInfo("Account created. A confirmation email may be required before you can sign in.");
