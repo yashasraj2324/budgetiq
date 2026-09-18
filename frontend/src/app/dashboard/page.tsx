@@ -1,6 +1,7 @@
 import { RechartsChart } from "@/components/RechartsChart";
 import { Shell } from "@/components/Shell";
 import Link from "next/link";
+import { API, apiFetch } from "@/lib/api";
 
 interface BudgetLineRow {
   id: number;
@@ -20,9 +21,27 @@ interface DashboardData {
   pending_recommendations: number;
   anomaly_count: number;
   departments?: { id: number; name: string; budget_lines: Omit<BudgetLineRow, 'department_name'>[] }[];
+  budget_lines?: BudgetLineRow[];
+  pagination?: { page: number; page_size: number; total: number; pages: number };
+  scenario?: string;
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ department_id?: string; category?: string; scenario?: string; search?: string; page?: string; page_size?: string }>;
+}) {
+  const params = await searchParams;
+  const query = new URLSearchParams();
+  if (params.department_id) query.set("department_id", params.department_id);
+  if (params.category && !["over-allocated", "variance", "scenario"].includes(params.category)) {
+    query.set("category", params.category);
+  }
+  if (params.search) query.set("search", params.search);
+  if (params.scenario) query.set("scenario", params.scenario);
+  if (params.page) query.set("page", params.page);
+  if (params.page_size) query.set("page_size", params.page_size);
+  const queryString = query.toString();
   let data: DashboardData = {
     total_budget: 25000000,
     total_remaining: 18450000,
@@ -33,24 +52,34 @@ export default async function DashboardPage() {
   let anomalies: { budget_line_id: number }[] = [];
   let syncedAt = "—";
   try {
-    const res = await fetch("http://localhost:8000/api/dashboard", { cache: "no-store" });
+    const res = await apiFetch(`${API}/dashboard${queryString ? `?${queryString}` : ""}`, { cache: "no-store" });
     if (res.ok) {
       data = await res.json();
       syncedAt = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
     }
-    const res2 = await fetch("http://localhost:8000/api/anomalies", { cache: "no-store" });
+    const res2 = await apiFetch(`${API}/anomalies`, { cache: "no-store" });
     if (res2.ok) anomalies = await res2.json();
-  } catch (_) {}
+  } catch {}
 
   const formatCurrency = (val: number) => "₹" + (val / 100000).toFixed(1) + "L";
   const formatINR = (val: number) => "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
   let all_budget_lines: BudgetLineRow[] = [];
-  if (data && data.departments) {
+  if (data.budget_lines) {
+    all_budget_lines = data.budget_lines;
+  } else if (data && data.departments) {
     data.departments.forEach((d) => {
       d.budget_lines.forEach((bl) => {
         all_budget_lines.push({ ...bl, department_name: d.name });
       });
+    });
+  }
+  if (!data.pagination && params.category === "over-allocated") {
+    all_budget_lines = all_budget_lines.filter((line) => line.remaining_budget < 0);
+  } else if (!data.pagination && params.category === "variance") {
+    all_budget_lines = all_budget_lines.filter((line) => {
+      const spent = line.allocated_amount - line.remaining_budget;
+      return line.allocated_amount > 0 && Math.abs(spent / line.allocated_amount - 1) > 0.05;
     });
   }
 
@@ -73,14 +102,14 @@ export default async function DashboardPage() {
               <span className="material-symbols-outlined text-[16px]">calendar_today</span>
               <span className="font-code-sm text-code-sm text-on-surface">FY25 &middot; Apr 01 &ndash; Jun 30</span>
             </div>
-            <button className="flex items-center gap-space-xs px-space-md py-1 bg-surface-container-lowest text-on-surface hover:bg-surface-container-low font-body-sm text-body-sm rounded shadow-sm transition-colors duration-150">
+            <Link href="/dashboard?category=scenario" className="flex items-center gap-space-xs px-space-md py-1 bg-surface-container-lowest text-outline font-body-sm text-body-sm rounded shadow-sm transition-colors duration-150">
               <span className="material-symbols-outlined text-[16px] text-outline">tune</span>
               <span>Filter Scenarios</span>
-            </button>
-            <button className="flex items-center gap-space-xs px-space-md py-1 bg-primary-container hover:bg-primary text-on-primary font-body-sm text-body-sm font-medium rounded shadow-sm transition-colors duration-150">
+            </Link>
+            <a href={`${API}/dashboard/export.csv${queryString ? `?${queryString}` : ""}`} className="flex items-center gap-space-xs px-space-md py-1 bg-surface-container-low text-outline font-body-sm text-body-sm font-medium rounded shadow-sm transition-colors duration-150">
               <span className="material-symbols-outlined text-[16px]">file_download</span>
               <span>Export CSV</span>
-            </button>
+            </a>
           </div>
         </div>
 
@@ -180,9 +209,9 @@ export default async function DashboardPage() {
               <span className="font-body-sm text-body-sm text-outline">Fiscal Year 2025 &middot; Q2 Department Breakdown</span>
             </div>
             <div className="flex items-center gap-space-xs bg-surface-container-low p-0.5 rounded">
-              <button className="px-space-md py-1 rounded bg-surface-container-lowest shadow-sm font-body-sm text-body-sm font-medium text-on-surface">All Departments</button>
-              <button className="px-space-md py-1 rounded text-outline hover:text-on-surface font-body-sm text-body-sm transition-colors">Over-allocated</button>
-              <button className="px-space-md py-1 rounded text-outline hover:text-on-surface font-body-sm text-body-sm transition-colors">Variance &gt; 5%</button>
+              <Link href="/dashboard" className="px-space-md py-1 rounded bg-surface-container-lowest shadow-sm font-body-sm text-body-sm font-medium text-outline">All Departments</Link>
+              <Link href="/dashboard?category=over-allocated" className="px-space-md py-1 rounded text-outline font-body-sm text-body-sm transition-colors">Over-allocated</Link>
+              <Link href="/dashboard?category=variance" className="px-space-md py-1 rounded text-outline font-body-sm text-body-sm transition-colors">Variance &gt; 5%</Link>
             </div>
           </div>
 
@@ -241,9 +270,9 @@ export default async function DashboardPage() {
                           <span>Resolve</span>
                         </Link>
                       ) : (
-                        <button className="inline-flex items-center gap-1 bg-surface-container hover:bg-surface-container-high text-on-surface px-3 py-1.5 rounded font-body-sm text-body-sm font-medium shadow-sm transition-colors duration-150" disabled>
+                        <Link href={`/budget-lines/${line.id}`} className="inline-flex items-center gap-1 bg-surface-container text-outline px-3 py-1.5 rounded font-body-sm text-body-sm font-medium transition-colors duration-150">
                           <span>View</span>
-                        </button>
+                        </Link>
                       )}
                     </td>
                   </tr>
@@ -252,11 +281,18 @@ export default async function DashboardPage() {
             </table>
           </div>
           <div className="px-space-lg py-space-md bg-surface-container-lowest flex items-center justify-between">
-            <span className="font-code-sm text-code-sm text-outline">Displaying {all_budget_lines.length} total ledger lines</span>
+            <span className="font-code-sm text-code-sm text-outline">Displaying {all_budget_lines.length}{data.pagination ? ` of ${data.pagination.total}` : ""} ledger lines</span>
             <div className="flex items-center gap-space-sm">
-              <button className="px-space-md py-1 rounded bg-surface-container-low text-outline font-body-sm text-body-sm hover:text-on-surface transition-colors" disabled>Previous</button>
-              <span className="font-code-sm text-code-sm font-medium text-on-surface">Page 1 / 1</span>
-              <button className="px-space-md py-1 rounded bg-surface-container-low text-on-surface font-body-sm text-body-sm hover:bg-surface-container transition-colors">Next</button>
+              {(() => {
+                const current = data.pagination?.page ?? 1;
+                const pages = data.pagination?.pages ?? 1;
+                const base = (p: number) => `/dashboard?${new URLSearchParams({ ...(params as Record<string, string>), page: String(p) }).toString()}`;
+                return <>
+                  <Link href={base(Math.max(1, current - 1))} className={`px-space-md py-1 rounded bg-surface-container-low text-outline font-body-sm text-body-sm ${current <= 1 ? "pointer-events-none opacity-50" : ""}`}>Previous</Link>
+                  <span className="font-code-sm text-code-sm font-medium text-on-surface">Page {current} / {pages}</span>
+                  <Link href={base(Math.min(pages, current + 1))} className={`px-space-md py-1 rounded bg-surface-container-low text-outline font-body-sm text-body-sm ${current >= pages ? "pointer-events-none opacity-50" : ""}`}>Next</Link>
+                </>;
+              })()}
             </div>
           </div>
         </div>

@@ -2,10 +2,11 @@
 import { Shell } from "@/components/Shell";
 import { ApprovalsTable } from "@/components/ApprovalsTable";
 import { useState, useEffect } from "react";
+import { API, apiFetch } from "@/lib/api";
 
-const API = "http://localhost:8000/api";
-
-function downloadCSV(rows: Record<string, any>[], filename: string) {
+type CsvValue = string | number | boolean | null | undefined;
+interface ApprovalRecommendation { id: number; source_line_id: number; target_line_id: number; amount: number; confidence: number; status: string; rationale_json?: Record<string, unknown>; }
+function downloadCSV(rows: Record<string, CsvValue>[], filename: string) {
   if (!rows.length) return;
   const headers = Object.keys(rows[0]);
   const csv = [
@@ -26,14 +27,14 @@ function downloadCSV(rows: Record<string, any>[], filename: string) {
 }
 
 export default function ApprovalsPage() {
-  const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [audit, setAudit] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<ApprovalRecommendation[]>([]);
+  const [audit, setAudit] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = () => {
     Promise.all([
-      fetch(`${API}/recommendations`, { cache: "no-store" }).then(r => r.json()),
-      fetch(`${API}/audit`, { cache: "no-store" }).then(r => r.json()),
+      apiFetch(`${API}/recommendations`, { cache: "no-store" }).then(r => r.json()),
+      apiFetch(`${API}/audit`, { cache: "no-store" }).then(r => r.json()),
     ]).then(([recs, auditEvents]) => {
       setRecommendations(recs);
       setAudit(auditEvents);
@@ -45,13 +46,13 @@ export default function ApprovalsPage() {
 
   const handleExport = () => {
     if (!audit.length) { alert("No audit events to export yet."); return; }
-    const rows = audit.map((e: any) => ({
-      id: e.id,
-      recommendation_id: e.recommendation_id,
-      action: e.action,
-      actor: e.actor,
-      timestamp: new Date(e.timestamp).toLocaleString("en-IN"),
-      ...e.event_metadata,
+    const rows = audit.map((e) => ({
+      id: String(e.id ?? ""),
+      recommendation_id: String(e.recommendation_id ?? ""),
+      action: String(e.action ?? ""),
+      actor: String(e.actor ?? ""),
+      timestamp: new Date(String(e.timestamp ?? "")).toLocaleString("en-IN"),
+      ...(typeof e.event_metadata === "object" && e.event_metadata ? e.event_metadata as Record<string, CsvValue> : {}),
     }));
     downloadCSV(rows, "budgetiq_audit_trail.csv");
   };
@@ -64,7 +65,7 @@ export default function ApprovalsPage() {
             <div className="flex items-center gap-space-sm mb-space-xs">
               <span className="font-label-caps text-label-caps uppercase text-outline tracking-wider">Compliance &amp; Governance</span>
               <span className="text-outline-variant font-mono text-[10px]">&middot;</span>
-              <span className="font-code-sm text-code-sm text-primary font-medium">SOC-2 Type II Certified Chain</span>
+              <span className="font-code-sm text-code-sm text-outline font-medium">Beta audit trail (not SOC-2 certified)</span>
             </div>
             <h1 className="font-headline-xl text-headline-xl text-on-surface tracking-tight">Approval History</h1>
             <p className="font-body-md text-body-md text-on-surface-variant mt-0.5">

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState } from "react";
 
 interface ShellProps {
   children: ReactNode;
@@ -8,13 +8,8 @@ interface ShellProps {
 }
 
 export function Shell({ children, activePath = "dashboard" }: ShellProps) {
-  const [userName, setUserName] = useState("");
-  const [userRole, setUserRole] = useState("");
-  
-  useEffect(() => {
-    setUserName(localStorage.getItem("actor_name") || "Alex Rivera");
-    setUserRole(localStorage.getItem("actor_role") || "VP Finance");
-  }, []);
+  const [userName] = useState(() => typeof window === "undefined" ? "BudgetIQ user" : sessionStorage.getItem("budgetiq_actor_name") || "BudgetIQ user");
+  const [userRole] = useState(() => process.env.NEXT_PUBLIC_AUTH_MODE === "dev" ? "Local developer" : "Authenticated user");
 
   return (
     <div className="flex h-screen w-full bg-background font-body-md text-on-surface antialiased overflow-hidden">
@@ -134,19 +129,7 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
             <div className="hidden md:flex flex-col text-right">
               <span 
                 className="font-body-md text-body-md font-semibold text-on-surface leading-none cursor-pointer hover:text-blue-600 transition-colors"
-                onClick={() => {
-                  const newName = prompt("Set user name:", userName);
-                  if (newName) {
-                    localStorage.setItem("actor_name", newName);
-                    setUserName(newName);
-                  }
-                  const newRole = prompt("Set user role (e.g. VP Finance, CFO):", userRole);
-                  if (newRole) {
-                    localStorage.setItem("actor_role", newRole);
-                    setUserRole(newRole);
-                  }
-                }}
-                title="Click to change user profile"
+                title="Authenticated session"
               >
                 {userName}
               </span>
