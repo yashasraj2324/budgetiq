@@ -22,12 +22,6 @@ class ProviderStatus:
 
 
 def configured_provider_status() -> list[ProviderStatus]:
-    groq_key = os.getenv("GROQ_API_KEY", "").strip()
-    groq_configured = bool(groq_key) and groq_key.lower() not in {
-        "your-groq-key-here",
-        "dummy_key_for_testing",
-    }
-
     billing_enabled = os.getenv("BUDGETIQ_BILLING_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
     stripe_configured = all(os.getenv(name, "").strip() for name in (
         "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID"
@@ -58,11 +52,5 @@ def configured_provider_status() -> list[ProviderStatus]:
             state=billing_state,
             configured=billing_configured,
             message=billing_message,
-        ),
-        ProviderStatus(
-            name="explanation",
-            state="configured" if groq_configured else "fallback",
-            configured=groq_configured,
-            message="Groq explains deterministic results; it never sets transfer amounts.",
         ),
     ]

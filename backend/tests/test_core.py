@@ -2,7 +2,7 @@
 Pydantic-Evals suite for BudgetIQ's critical paths:
   1. Reallocation engine guardrails
   2. Anomaly detection thresholds
-  3. Qwen output validation (offline — uses mocked reasoning)
+   3. Reasoning output validation (offline — deterministic)
 
 Run:  python -m pytest backend/tests/ -v
 """
@@ -78,12 +78,12 @@ class TestAnomalyDetection:
         assert not result.detected  # baseline=0, guard handles it
 
 
-# ── 3. QwenReasoning Pydantic model validation ────────────────────────────────
-from app.models import QwenReasoning, ReasoningStep
+# ── 3. ReasoningOutput Pydantic model validation ─────────────────────────────
+from app.models import ReasoningOutput, ReasoningStep
 
-class TestQwenReasoningModel:
+class TestReasoningOutputModel:
     def test_valid_reasoning(self):
-        r = QwenReasoning(
+        r = ReasoningOutput(
             recommendation="Move ₹4.8L from Regional Events to Onboarding",
             reasoning_steps=[
                 ReasoningStep(step=1, label="Anomaly", detail="3.2x spend velocity"),
@@ -95,7 +95,7 @@ class TestQwenReasoningModel:
 
     def test_confidence_out_of_range(self):
         with pytest.raises(Exception):
-            QwenReasoning(
+            ReasoningOutput(
                 recommendation="test",
                 reasoning_steps=[],
                 confidence=1.5,  # invalid
@@ -103,7 +103,7 @@ class TestQwenReasoningModel:
 
     def test_confidence_negative(self):
         with pytest.raises(Exception):
-            QwenReasoning(
+            ReasoningOutput(
                 recommendation="test",
                 reasoning_steps=[],
                 confidence=-0.1,

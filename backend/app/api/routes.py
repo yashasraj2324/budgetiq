@@ -24,7 +24,7 @@ from ..models import (
 )
 from ..services.anomaly import detect_velocity_anomaly
 from ..services.engine import GuardrailResult, calculate_transfer, validate_custom_amount
-from ..services.qwen import get_reasoning
+from ..services.explanation import build_reasoning
 from ..services.forecast import forecast_spend, forecast_provenance, backtest_forecast, is_insufficient
 from ..services.approval_engine import can_approve, can_reject, check_escalation, build_tier_approval_entry, ApprovalState
 from ..providers import configured_provider_status
@@ -780,40 +780,33 @@ async def generate_recommendation(req: GenerateRequest, db: Database = Depends(g
     entries = list(db.spend_entries.find({"budget_line_id": source["id"]}).sort("period", 1))
     anomaly = detect_velocity_anomaly([e["amount_spent"] for e in entries])
 
-    src_perf = db.performance_scores.find_one({"budget_line_id": source["id"]}, sort=[("period", -1)])
-    tgt_perf = db.performance_scores.find_one({"budget_line_id": target["id"]}, sort=[("period", -1)])
-
     transfer = _persisted_amount(guardrails.transfer)
-    reasoning = await get_reasoning(
+    reasoning = build_reasoning(
         source_name=source.get("name", "Unknown"),
         source_priority=source.get("priority_weight", 50),
-        source_performance=src_perf["score"] if src_perf else 50.0,
-        remaining_budget=source["remaining_budget"],
         velocity_multiplier=anomaly.velocity_multiplier,
         target_name=target.get("name", "Unknown"),
         target_priority=target.get("priority_weight", 50),
-        target_performance=tgt_perf["score"] if tgt_perf else 50.0,
-        target_funding_gap=guardrails.target_funding_gap,
         transfer=transfer,
         capped_by=guardrails.capped_by,
     )
 
-    # FR-012: Validate AI output — verify line names + required fields present
+    # FR-012: Validate reasoning output — verify line names + required fields present
     if (
         reasoning.validated_transfer is not None
         and _money(reasoning.validated_transfer) != _money(transfer)
     ):
-        raise HTTPException(502, "AI explanation disagreed with deterministic transfer")
+        raise HTTPException(502, "Reasoning explanation disagreed with deterministic transfer")
     reasoning.validated_transfer = _money(transfer)
     src_name = source.get("name", "").lower()
     tgt_name = target.get("name", "").lower()
     rec_text = reasoning.recommendation.lower()
     if src_name not in rec_text and tgt_name not in rec_text:
-        reasoning.recommendation += f" [AI-Validated: {source['name']} → {target['name']}, ₹{guardrails.transfer:,.0f}]"
+        reasoning.recommendation += f" [Validated: {source['name']} → {target['name']}, ₹{guardrails.transfer:,.0f}]"
     if not reasoning.reasoning_steps or len(reasoning.reasoning_steps) < 1:
-        raise HTTPException(500, "AI response missing reasoning_steps — generation failed")
+        raise HTTPException(500, "Reasoning missing reasoning_steps — generation failed")
     if not reasoning.rejection_consequence:
-        raise HTTPException(500, "AI response missing rejection_consequence — generation failed")
+        raise HTTPException(500, "Reasoning missing rejection_consequence — generation failed")
     if f"{guardrails.transfer:,.0f}" not in reasoning.recommendation and str(int(guardrails.transfer)) not in reasoning.recommendation:
         reasoning.recommendation += f" [Validated Transfer: ₹{guardrails.transfer:,.0f}]"
 

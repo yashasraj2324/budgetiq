@@ -413,17 +413,17 @@ class ReasoningStep(BaseModel):
     label: str
     detail: str
 
-class QwenReasoning(BaseModel):
+class ReasoningOutput(BaseModel):
     recommendation: str
     reasoning_steps: list[ReasoningStep] = Field(default_factory=list)
     confidence: float
     rejection_consequence: str = ""
-    # Optional echo from the provider. When present it must match the
-    # deterministic engine; the API never uses this value to move money.
+    # Echo of the deterministic transfer. The API never uses this value to
+    # move money; it only documents the exact amount.
     validated_transfer: Decimal | None = None
-    explanation_source: str = "groq"
+    explanation_source: str = "deterministic"
     @model_validator(mode="after")
-    def confidence_range(self) -> "QwenReasoning":
+    def confidence_range(self) -> "ReasoningOutput":
         if not 0.0 <= self.confidence <= 1.0:
             raise ValueError("confidence must be 0.0-1.0")
         return self

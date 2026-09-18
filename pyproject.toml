@@ -10,7 +10,6 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "pymongo>=4.8.0",
     "pydantic>=2.7.0",
-    "pydantic-ai>=2.5.0",
     "pydantic-evals>=2.5.0",
     "logfire[fastapi,sqlalchemy]>=4.0.0",
     "python-dotenv>=1.0.0",
