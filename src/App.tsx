@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import LoginPage from "./pages/index";
 import SignupPage from "./pages/signup";
 import ResetPasswordPage from "./pages/reset-password";
+import AcceptInvitationPage from "./pages/accept-invitation";
 import OnboardingPage from "./pages/onboarding";
 import OnboardingDataPage from "./pages/onboarding/data";
 import OnboardingPoliciesPage from "./pages/onboarding/policies";
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/onboarding/data" element={<OnboardingDataPage />} />
         <Route path="/onboarding/policies" element={<OnboardingPoliciesPage />} />

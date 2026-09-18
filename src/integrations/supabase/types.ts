@@ -3812,6 +3812,7 @@ export type Database = {
           source_line_id: number
           status: string
           target_line_id: number
+          tier_approvals: Json
         }
         Insert: {
           amount: number
@@ -3824,6 +3825,7 @@ export type Database = {
           source_line_id: number
           status?: string
           target_line_id: number
+          tier_approvals?: Json
         }
         Update: {
           amount?: number
@@ -3836,6 +3838,7 @@ export type Database = {
           source_line_id?: number
           status?: string
           target_line_id?: number
+          tier_approvals?: Json
         }
         Relationships: [
           {

@@ -86,6 +86,10 @@ export default function SettingsPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("finance_user");
   const [inviteDays, setInviteDays] = useState(7);
+  const [inviteLinks, setInviteLinks] = useState<Record<number, string>>({});
+
+  const invitationLink = (token: string) =>
+    `${window.location.origin}/accept-invitation?token=${encodeURIComponent(token)}`;
 
   useEffect(() => {
     void reload();
@@ -217,7 +221,13 @@ export default function SettingsPage() {
 
     const invitation = await response.json();
     setInviteEmail("");
-    setMessage(`Invitation created for ${invitation.email}. Token shown once: ${invitation.token}`);
+    if (invitation.token) {
+      const link = invitationLink(invitation.token);
+      setInviteLinks((previous) => ({ ...previous, [invitation.id]: link }));
+      setMessage(`Invitation created for ${invitation.email}. Invite link ready to copy below.`);
+    } else {
+      setMessage(`Invitation created for ${invitation.email}.`);
+    }
     await reload();
   }
 
@@ -232,7 +242,13 @@ export default function SettingsPage() {
     }
 
     const payload = await response.json();
-    setMessage(`Invitation resent. New token (shown once): ${payload.token}`);
+    if (payload.token) {
+      const link = invitationLink(payload.token);
+      setInviteLinks((previous) => ({ ...previous, [invitationId]: link }));
+      setMessage("Invitation resent. New invite link ready to copy below.");
+    } else {
+      setMessage("Invitation resent.");
+    }
   }
 
   async function cancelInvitation(invitationId: number) {
@@ -247,6 +263,22 @@ export default function SettingsPage() {
 
     setInvitations((previous) => previous.filter((invitation) => invitation.id !== invitationId));
     setMessage("Invitation cancelled.");
+  }
+
+  async function copyInviteLink(invitationId: number) {
+    const link = inviteLinks[invitationId];
+    if (!link) {
+      setMessage("Generate a link first by creating or resending the invitation.");
+      return;
+    }
+    setError("");
+    setMessage("");
+    try {
+      await navigator.clipboard.writeText(link);
+      setMessage("Invitation link copied.");
+    } catch {
+      setMessage(`Invitation link: ${link}`);
+    }
   }
 
   async function createApiKey(event: FormEvent<HTMLFormElement>) {
@@ -461,14 +493,28 @@ export default function SettingsPage() {
                   <h3 className="font-semibold text-on-surface mb-2">Pending invitations</h3>
                   <div className="space-y-2">
                     {invitations.map((invitation) => (
-                      <div key={invitation.id} className="rounded border border-outline-variant p-3 flex items-center justify-between gap-2">
-                        <div>
-                          <p className="text-sm text-on-surface font-medium">{invitation.email}</p>
-                          <p className="text-xs text-outline">{invitation.role} - {invitation.status}</p>
+                      <div key={invitation.id} className="rounded border border-outline-variant p-3 flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm text-on-surface font-medium">{invitation.email}</p>
+                            <p className="text-xs text-outline">{invitation.role} - {invitation.status}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => void resendInvitation(invitation.id)} className="text-sm text-primary">Resend</button>
+                            <button onClick={() => void cancelInvitation(invitation.id)} className="text-sm text-error">Revoke</button>
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => void resendInvitation(invitation.id)} className="text-sm text-primary">Resend</button>
-                          <button onClick={() => void cancelInvitation(invitation.id)} className="text-sm text-error">Revoke</button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => void copyInviteLink(invitation.id)}
+                            disabled={!inviteLinks[invitation.id]}
+                            className="text-sm text-primary disabled:opacity-40"
+                          >
+                            {inviteLinks[invitation.id] ? "Copy invite link" : "Resend to get link"}
+                          </button>
+                          {inviteLinks[invitation.id] && (
+                            <span className="text-xs text-outline truncate max-w-[260px]">{inviteLinks[invitation.id]}</span>
+                          )}
                         </div>
                       </div>
                     ))}

@@ -28,12 +28,57 @@ interface DashboardData {
   scenario?: string;
 }
 
+interface OrgConfig {
+  org_name?: string;
+  fiscal_year?: string;
+  currency?: string;
+}
+
+interface FiscalCalendar {
+  fiscal_year_start_month?: number;
+  period_type?: string;
+  period_labels?: string[];
+}
+
+function currentPeriodLabel(calendar: FiscalCalendar): string {
+  const start = Number(calendar.fiscal_year_start_month) || 4;
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const idx = ((month - start) + 12) % 12;
+  const type = calendar.period_type ?? "quarterly";
+  if (type === "monthly") {
+    const labels = calendar.period_labels?.length === 12
+      ? calendar.period_labels
+      : ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
+    return labels[idx] ?? `M${idx + 1}`;
+  }
+  const quarter = Math.floor(idx / 3);
+  const labels = calendar.period_labels?.length ? calendar.period_labels : ["Q1", "Q2", "Q3", "Q4"];
+  return labels[quarter] ?? `Q${quarter + 1}`;
+}
+
 export default function DashboardPage() {
   const [searchParams] = useSearchParams();
   const [data, setData] = useState<DashboardData | null>(null);
   const [anomalies, setAnomalies] = useState<{ budget_line_id: number }[]>([]);
   const [syncedAt, setSyncedAt] = useState("—");
   const [error, setError] = useState("");
+  const [config, setConfig] = useState<OrgConfig>({});
+  const [calendar, setCalendar] = useState<FiscalCalendar>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [configRes, calendarRes] = await Promise.all([
+        apiFetch(`${API}/onboarding/config`).catch(() => null),
+        apiFetch(`${API}/organization/fiscal-calendar`).catch(() => null),
+      ]);
+      if (cancelled) return;
+      if (configRes?.ok) setConfig(await configRes.json());
+      if (calendarRes?.ok) setCalendar(await calendarRes.json());
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const params = {
     department_id: searchParams.get("department_id") ?? undefined,
@@ -78,6 +123,10 @@ export default function DashboardPage() {
 
   const formatCurrency = (val: number) => "₹" + (val / 100000).toFixed(1) + "L";
   const formatINR = (val: number) => "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  const orgName = config.org_name?.trim() || "Executive Portfolio Ledger";
+  const fiscalYear = config.fiscal_year?.trim() || "FY25";
+  const currency = config.currency?.trim() || "INR";
+  const periodLabel = currentPeriodLabel(calendar);
 
   if (error) {
     return (
@@ -126,8 +175,8 @@ export default function DashboardPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-space-md">
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-space-sm">
-              <span className="font-headline-lg text-headline-lg text-on-surface tracking-tight">Executive Portfolio Ledger</span>
-              <span className="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-code-sm text-code-sm uppercase">Q2 Live Sync</span>
+              <span className="font-headline-lg text-headline-lg text-on-surface tracking-tight">{orgName}</span>
+              <span className="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-code-sm text-code-sm uppercase">{periodLabel} Live Sync</span>
               <span className="text-xs text-outline font-medium">Last synced: {syncedAt}</span>
             </div>
             <p className="font-body-sm text-body-sm text-outline">Real-time ledger audit trail across {data.departments?.length ?? 0} operating departments.</p>
@@ -135,7 +184,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-space-sm">
             <div className="flex items-center bg-surface-container-lowest px-space-md py-1 rounded shadow-sm gap-space-xs text-outline">
               <span className="material-symbols-outlined text-[16px]">calendar_today</span>
-              <span className="font-code-sm text-code-sm text-on-surface">FY25 &middot; Apr 01 &ndash; Jun 30</span>
+              <span className="font-code-sm text-code-sm text-on-surface">{fiscalYear} &middot; {periodLabel}</span>
             </div>
             <Link to="/dashboard?category=scenario" className="flex items-center gap-space-xs px-space-md py-1 bg-surface-container-lowest text-outline font-body-sm text-body-sm rounded shadow-sm transition-colors duration-150">
               <span className="material-symbols-outlined text-[16px] text-outline">tune</span>
@@ -161,7 +210,7 @@ export default function DashboardPage() {
               <div className="font-numeric-metric-lg text-numeric-metric-lg text-on-surface tracking-tight font-semibold">
                 {formatCurrency(data.total_budget)}
               </div>
-              <div className="font-code-sm text-code-sm text-outline mt-1">INR &middot; FY25 Q2</div>
+              <div className="font-code-sm text-code-sm text-outline mt-1">{currency} &middot; {fiscalYear} {periodLabel}</div>
             </div>
             <div className="pt-space-sm text-right">
               <span className="font-code-sm text-code-sm text-outline">Fiscal envelope</span>
@@ -241,7 +290,7 @@ export default function DashboardPage() {
                 <span className="font-headline-md text-headline-md text-on-surface">Budget Lines</span>
                 <span className="px-2 py-0.5 rounded bg-surface-container-low text-outline font-code-sm text-code-sm">{all_budget_lines.length} Active Feeds</span>
               </div>
-              <span className="font-body-sm text-body-sm text-outline">Fiscal Year 2025 &middot; Q2 Department Breakdown</span>
+              <span className="font-body-sm text-body-sm text-outline">Fiscal {fiscalYear} &middot; {periodLabel} Department Breakdown</span>
             </div>
             <div className="flex items-center gap-space-xs bg-surface-container-low p-0.5 rounded">
               <Link to="/dashboard" className="px-space-md py-1 rounded bg-surface-container-lowest shadow-sm font-body-sm text-body-sm font-medium text-outline">All Departments</Link>

@@ -68,6 +68,31 @@ const money = (v: unknown): number => Math.round(num(v) * 100) / 100;
 // Auth
 // ---------------------------------------------------------------------------
 async function resolveAuth(req: Request, supabase: ReturnType<typeof createClient>) {
+  // API-key path: `X-API-Key: biq_...` lets external tools use the REST contract
+  // with the scopes granted at creation time.
+  const apiKeyHeader = req.headers.get("X-API-Key");
+  if (apiKeyHeader) {
+    const keyHash = await hashKey(apiKeyHeader);
+    const { data: key } = await supabase
+      .from("organization_api_keys")
+      .select("id, organization_id, scopes, created_by, expires_at, revoked_at")
+      .eq("key_hash", keyHash)
+      .maybeSingle();
+    if (!key || key.revoked_at) throw new HttpError(401, "Invalid or revoked API key");
+    if (key.expires_at && new Date(String(key.expires_at)).getTime() < Date.now()) {
+      throw new HttpError(401, "API key has expired");
+    }
+    return {
+      user_id: (key.created_by as string) ?? "",
+      org_id: key.organization_id as string,
+      role: "admin",
+      display_name: "API Key",
+      email: "",
+      auth_mode: "key" as const,
+      scopes: Array.isArray(key.scopes) ? (key.scopes as string[]) : ["*"],
+    };
+  }
+
   const authz = req.headers.get("Authorization") ?? "";
   const token = authz.startsWith("Bearer ") ? authz.slice(7).trim() : null;
   if (!token) throw new HttpError(401, "Bearer authentication required");
@@ -79,7 +104,12 @@ async function resolveAuth(req: Request, supabase: ReturnType<typeof createClien
   const userDisplay = (userData.user.user_metadata?.display_name as string) || userEmail.split("@")[0] || "User";
 
   // Resolve the user's organization. A brand-new signup has no membership yet:
-  // provision a personal workspace so onboarding can proceed immediately.
+  // provision a personal workspace so onboarding can proceed immediately — but
+  // never for an invitation-accept request, which joins the inviting org instead.
+  let reqPathname = "";
+  try { reqPathname = new URL(req.url).pathname; } catch { /* ignore */ }
+  const isInviteAccept = reqPathname.includes("invitations/accept");
+
   let orgId: string;
   let role: string;
   {
@@ -87,10 +117,15 @@ async function resolveAuth(req: Request, supabase: ReturnType<typeof createClien
       .from("organization_members")
       .select("organization_id, role")
       .eq("user_id", userData.user.id)
+      .order("created_at", { ascending: true })
       .maybeSingle();
     if (membership) {
       orgId = membership.organization_id as string;
       role = (membership.role as string) || "finance_user";
+    } else if (isInviteAccept) {
+      // No membership and not provisioning: the accept handler resolves the org.
+      orgId = "";
+      role = "";
     } else {
       const { data: newOrg, error: orgErr } = await supabase
         .from("organizations")
@@ -115,7 +150,43 @@ async function resolveAuth(req: Request, supabase: ReturnType<typeof createClien
     role,
     display_name: userDisplay,
     email: userEmail,
+    auth_mode: "jwt" as const,
+    scopes: [] as string[],
   };
+}
+
+// Map a route + method to the API-key scope that authorizes it. API-key requests
+// are denied whenever the required scope (or "*") is not on the key.
+function requiredScope(seg: string[], method: string): string | null {
+  const first = seg[0] ?? "";
+  const isRead = method === "GET";
+  switch (first) {
+    case "dashboard":
+    case "departments":
+    case "anomalies":
+    case "performance-scores":
+      return isRead ? "budgets:read" : "budgets:write";
+    case "budget-lines":
+      return isRead ? "budgets:read" : "budgets:write";
+    case "recommendations": {
+      if (seg[2] && ["approve", "modify", "reject"].includes(seg[2])) return "approvals:write";
+      return isRead ? "recommendations:read" : "recommendations:write";
+    }
+    case "audit":
+      return "reports:read";
+    case "governance":
+      return isRead ? "approvals:read" : "approvals:write";
+    case "scenarios":
+      return isRead ? "scenarios:read" : "scenarios:write";
+    case "api-keys":
+      return "api_keys:manage";
+    case "onboarding":
+      return seg[1] === "config" ? (isRead ? "organization:read" : "organization:write") : "budgets:write";
+    case "organization":
+      return isRead ? "organization:read" : "organization:write";
+    default:
+      return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -293,6 +364,41 @@ async function logAudit(
 }
 
 // ---------------------------------------------------------------------------
+// Approval policy enforcement (tiers / delegation / dual-sign / escalation)
+// ---------------------------------------------------------------------------
+async function loadApprovalPolicy(supabase: ReturnType<typeof createClient>, orgId: string): Promise<{
+  tiers: { level: number; min_amount: number; approver_roles: string[] }[];
+  escalation_hours: number;
+  delegated_approvers: string[];
+  dual_sign: boolean;
+}> {
+  const { data: policy } = await supabase.from("approval_policies").select("*").eq("organization_id", orgId).maybeSingle();
+  if (policy) {
+    return {
+      tiers: Array.isArray(policy.tiers)
+        ? (policy.tiers as { level: number; min_amount: number; approver_roles: string[] }[])
+        : [],
+      escalation_hours: Number(policy.escalation_hours ?? 24),
+      delegated_approvers: Array.isArray(policy.delegated_approvers) ? (policy.delegated_approvers as string[]) : [],
+      dual_sign: Boolean(policy.dual_sign),
+    };
+  }
+  return {
+    tiers: [{ level: 1, min_amount: 0, approver_roles: [...APPROVER_ROLES] }],
+    escalation_hours: 24,
+    delegated_approvers: [],
+    dual_sign: false,
+  };
+}
+
+function actorEligible(userRole: string, userId: string, tier: { approver_roles?: string[] } | null, policy: Record<string, unknown>) {
+  const roles = new Set((tier?.approver_roles ?? []) as string[]);
+  if (roles.has(userRole)) return true;
+  const delegated = (policy?.delegated_approvers ?? []) as string[];
+  return delegated.includes(userId);
+}
+
+// ---------------------------------------------------------------------------
 // Request handlers
 // ---------------------------------------------------------------------------
 async function handleRequest(req: Request, supabase: ReturnType<typeof createClient>, ctx: Awaited<ReturnType<typeof resolveAuth>>, path: string, method: string) {
@@ -300,10 +406,19 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
   const query = url.searchParams;
   const { org_id, role, user_id, display_name } = ctx;
   const isAdmin = ADMIN_ROLES.has(role);
-  const isApprover = APPROVER_ROLES.has(role);
 
   const seg = path.split("/").filter(Boolean);
   const first = seg[0] ?? "";
+
+  // API keys: enforce the scopes granted at creation time (server-side only).
+  if (ctx.auth_mode === "key") {
+    const scope = requiredScope(seg, method);
+    if (!scope) throw new HttpError(404, "Not found");
+    const granted = ctx.scopes ?? [];
+    if (!granted.includes("*") && !granted.includes(scope)) {
+      throw new HttpError(403, `API key does not grant scope '${scope}' for this operation`);
+    }
+  }
 
   // ---- Dashboard ---------------------------------------------------------
   if (first === "dashboard" && seg.length === 1 && method === "GET") {
@@ -611,6 +726,27 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     }));
   }
 
+  if (first === "budget-lines" && seg.length === 3 && seg[2] === "spend" && method === "POST") {
+    if (!isAdmin) throw new HttpError(403, "Organization administrator role required");
+    const lineId = Number(seg[1]);
+    const { data: line } = await supabase.from("budget_lines").select("id").eq("organization_id", org_id).eq("id", lineId).maybeSingle();
+    if (!line) throw new HttpError(404, "Budget line not found");
+    const body = await req.json();
+    const period = String(body.period ?? "").trim();
+    const amountSpent = money(body.amount_spent);
+    if (!period) throw new HttpError(422, "period is required (e.g. FY25-Q2 or FY25-W09)");
+    if (amountSpent < 0) throw new HttpError(422, "amount_spent must be non-negative");
+    const { data: existing } = await supabase.from("spend_entries").select("id").eq("organization_id", org_id).eq("budget_line_id", lineId).eq("period", period).maybeSingle();
+    if (existing) {
+      await supabase.from("spend_entries").update({ amount_spent: amountSpent }).eq("id", existing.id);
+    } else {
+      const { error } = await supabase.from("spend_entries").insert({ organization_id: org_id, budget_line_id: lineId, period, amount_spent: amountSpent });
+      if (error) throw new HttpError(422, `Unable to record spend: ${error.message}`);
+    }
+    await logAudit(supabase, ctx, "spend_entry_added", { budget_line_id: lineId, period, amount_spent: amountSpent });
+    return json({ ok: true, budget_line_id: lineId, period, amount_spent: amountSpent }, 201);
+  }
+
   if (first === "budget-lines" && seg.length === 3 && seg[2] === "forecast" && method === "GET") {
     const { data: line } = await supabase.from("budget_lines").select("id").eq("organization_id", org_id).eq("id", Number(seg[1])).maybeSingle();
     if (!line) throw new HttpError(404, "Budget line not found");
@@ -644,7 +780,8 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
   // ---- Recommendations ----------------------------------------------------
   if (first === "recommendations" && seg.length === 1 && method === "GET") {
     const { data: recs } = await supabase.from("recommendations").select("*").eq("organization_id", org_id).order("id", { ascending: false });
-    const out = (recs ?? []).map((r) => recOut(r));
+    const policy = await loadApprovalPolicy(supabase, org_id);
+    const out = (recs ?? []).map((r) => recOut(r, policy));
     const status = query.get("status");
     const filtered = status ? out.filter((r) => r.status === status) : out;
     return json(pageItems(filtered, query.get("page") ? Number(query.get("page")) : null, query.get("page_size") ? Number(query.get("page_size")) : null));
@@ -682,41 +819,27 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
       `Generate a recommendation with 6 reasoning steps, a confidence score, and a one-sentence estimated consequence if this recommendation is rejected. ` +
       `If you echo the calculated transfer, put the exact provided value in validated_transfer. Never recalculate or change that value.`;
 
+    // Real AI reasoning only — no deterministic fabrication fallback. If the
+    // provider is unconfigured, fails, or returns invalid output, surface the
+    // failure instead of silently substituting an explanation.
     const groq = await groqReasoning(evidencePrompt, transfer);
-    let rationale: Record<string, unknown>;
-    let confidence = deterministicConfidence;
-    if (groq && Math.abs(Number(groq.validated_transfer) - transfer) < 1) {
-      confidence = Math.min(1, Math.max(0, Number(groq.confidence) || deterministicConfidence));
-      rationale = {
-        recommendation: String(groq.recommendation),
-        reasoning_steps: (groq.reasoning_steps as { step: number; label: string; detail: string }[]).map((s) => ({
-          step: Number(s.step), label: String(s.label), detail: String(s.detail),
-        })),
-        confidence,
-        rejection_consequence: String(groq.rejection_consequence ?? ""),
-        validated_transfer: transfer,
-        explanation_source: "groq",
-      };
-    } else {
-      rationale = {
-        recommendation:
-          `Transfer ₹${transfer.toLocaleString("en-IN")} from ${source.name} to ${target.name}. ` +
-          `${source.name} shows a ${anomaly.velocity_multiplier.toFixed(1)}× spend velocity anomaly with priority ${source.priority_weight}/100, ` +
-          `while ${target.name} is underfunded against a priority ${target.priority_weight}/100 commitment.`,
-        reasoning_steps: [
-          { step: 1, label: "Anomaly Detection", detail: anomaly.detected ? `${source.name} spend velocity is ${anomaly.velocity_multiplier.toFixed(1)}× the baseline, triggering the threshold breach alert.` : `${source.name} shows no significant velocity anomaly; reallocation is driven by priority and surplus.` },
-          { step: 2, label: "Priority Scoring", detail: `${source.name} priority is ${source.priority_weight}/100 vs ${target.name} at ${target.priority_weight}/100 — a ${Math.abs(priorityGap)}-point gap.` },
-          { step: 3, label: "Surplus Calculation", detail: `Source surplus = ₹${sourceRemaining.toLocaleString("en-IN")} remaining − ₹${num(source.necessary_future_spend).toLocaleString("en-IN")} future − ₹${num(source.safety_reserve).toLocaleString("en-IN")} reserve = ₹${Math.max(0, guardrails.source_surplus).toLocaleString("en-IN")} transferable.` },
-          { step: 4, label: "Funding Gap Analysis", detail: `${target.name} funding gap is ₹${targetFundingGap.toLocaleString("en-IN")}.` },
-          { step: 5, label: "Guardrail Validation", detail: `Transfer of ₹${transfer.toLocaleString("en-IN")} is within all guardrails (capped by ${guardrails.capped_by}).` },
-          { step: 6, label: "Confidence Assessment", detail: `Confidence ${(confidence * 100).toFixed(0)}%: ${anomaly.detected ? "strong anomaly signal" : "priority differential"} and clean guardrail pass.` },
-        ],
-        confidence,
-        rejection_consequence: `If rejected, ${target.name} remains underfunded while ${source.name} continues its current spend trajectory.`,
-        validated_transfer: transfer,
-        explanation_source: "deterministic_fallback",
-      };
+    if (!groq || !Number.isFinite(Number(groq.validated_transfer)) || Math.abs(Number(groq.validated_transfer) - transfer) >= 1) {
+      throw new HttpError(
+        503,
+        "AI reasoning is currently unavailable (provider unconfigured, unreachable, or returned invalid output). No recommendation was created. Configure the reasoning provider and try again.",
+      );
     }
+    const confidence = Math.min(1, Math.max(0, Number(groq.confidence) || deterministicConfidence));
+    const rationale = {
+      recommendation: String(groq.recommendation),
+      reasoning_steps: (groq.reasoning_steps as { step: number; label: string; detail: string }[]).map((s) => ({
+        step: Number(s.step), label: String(s.label), detail: String(s.detail),
+      })),
+      confidence,
+      rejection_consequence: String(groq.rejection_consequence ?? ""),
+      validated_transfer: transfer,
+      explanation_source: "groq",
+    };
 
     const { data: created, error } = await supabase.from("recommendations").insert({
       organization_id: org_id,
@@ -734,11 +857,11 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
   if (first === "recommendations" && seg.length === 2 && method === "GET") {
     const { data: rec } = await supabase.from("recommendations").select("*").eq("organization_id", org_id).eq("id", Number(seg[1])).maybeSingle();
     if (!rec) throw new HttpError(404, "Recommendation not found");
-    return json(recOut(rec));
+    const policy = await loadApprovalPolicy(supabase, org_id);
+    return json(recOut(rec, policy));
   }
 
   if (first === "recommendations" && seg.length === 3 && ["approve", "modify", "reject"].includes(seg[2]) && method === "POST") {
-    if (!isApprover) throw new HttpError(403, "Finance approver role required");
     const recId = Number(seg[1]);
     const { data: rec } = await supabase.from("recommendations").select("*").eq("organization_id", org_id).eq("id", recId).maybeSingle();
     if (!rec) throw new HttpError(404, "Recommendation not found");
@@ -747,23 +870,52 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     const { data: source } = await supabase.from("budget_lines").select("*").eq("organization_id", org_id).eq("id", Number(rec.source_line_id)).maybeSingle();
     const { data: target } = await supabase.from("budget_lines").select("*").eq("organization_id", org_id).eq("id", Number(rec.target_line_id)).maybeSingle();
     if (!source || !target) throw new HttpError(409, "Recommendation references a missing budget line");
+
+    // Enforce the saved approval policy: each approval step must be taken by a
+    // role in that step's tier (or a delegated approver); dual-sign requires a
+    // second, different actor.
+    const policy = await loadApprovalPolicy(supabase, org_id);
+    const policyTiers = [...policy.tiers].sort((a, b) => Number(a.level) - Number(b.level));
+    const tierApprovals: { tier_level: number; actor_user_id: string; actor_role: string; approved_at: string; action: string }[] =
+      Array.isArray(rec.tier_approvals)
+        ? (rec.tier_approvals as { tier_level: number; actor_user_id: string; actor_role: string; approved_at: string; action: string }[])
+        : [];
+    const completedLevels = tierApprovals.map((t) => Number(t.tier_level));
+    const currentLevel = (completedLevels.length ? Math.max(...completedLevels) : 0) + 1;
+    const stepTier = policyTiers.find((t) => Number(t.level) === currentLevel) ?? policyTiers[policyTiers.length - 1];
+    if (!actorEligible(role, user_id, stepTier ?? null, policy)) {
+      throw new HttpError(403, `Your role '${role}' is not authorised for approval step ${currentLevel}`);
+    }
+    const maxLevel = (policyTiers.length ? Math.max(...policyTiers.map((t) => Number(t.level))) : 1) || 1;
+    const requiredSignatures = policy.dual_sign ? Math.max(2, maxLevel) : maxLevel;
+    if (policy.dual_sign && tierApprovals.length >= 1 && tierApprovals[0].actor_user_id === user_id) {
+      throw new HttpError(403, "Dual-sign requires a second, different approver");
+    }
+
+    const appTime = new Date().toISOString();
     const metrics = await loadMetrics(supabase, org_id);
     const prevSource = liveRemaining(source, metrics);
     const prevTarget = liveRemaining(target, metrics);
     const amount = num(rec.amount);
-    const appTime = new Date().toISOString();
+    const newApproval = { tier_level: currentLevel, actor_user_id: user_id, actor_role: role, approved_at: appTime, action: seg[2] };
 
     if (seg[2] === "approve") {
       if (prevSource < amount) throw new HttpError(422, `Approval would make source budget negative (remaining: ₹${prevSource.toLocaleString("en-IN")}, amount: ₹${amount.toLocaleString("en-IN")})`);
-      const { error } = await supabase.from("recommendations").update({ status: "approved", approved_at: appTime }).eq("organization_id", org_id).eq("id", recId).eq("status", "pending");
+      const fullyApproved = tierApprovals.length + 1 >= requiredSignatures;
+      const nextApprovals = [...tierApprovals, newApproval];
+      const { error } = await supabase.from("recommendations").update({
+        status: fullyApproved ? "approved" : "pending",
+        tier_approvals: nextApprovals,
+        ...(fullyApproved ? { approved_at: appTime } : {}),
+      }).eq("organization_id", org_id).eq("id", recId).eq("status", "pending");
       if (error) throw new HttpError(409, "Recommendation was already changed");
       await logAudit(supabase, ctx, "approve", {
         previous_source_budget: money(prevSource), new_source_budget: money(prevSource - amount),
         previous_target_budget: money(prevTarget), new_target_budget: money(prevTarget + amount),
-        amount: money(amount),
+        amount: money(amount), tier_level: currentLevel, tier_approvals_count: nextApprovals.length,
       }, recId);
       const { data: updated } = await supabase.from("recommendations").select("*").eq("organization_id", org_id).eq("id", recId).single();
-      return json(recOut(updated));
+      return json(recOut(updated, policy));
     }
 
     if (seg[2] === "reject") {
@@ -776,7 +928,7 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
         reason: body.reason ?? "", amount: money(amount),
       }, recId);
       const { data: updated } = await supabase.from("recommendations").select("*").eq("organization_id", org_id).eq("id", recId).single();
-      return json(recOut(updated));
+      return json(recOut(updated, policy));
     }
 
     // modify
@@ -785,17 +937,18 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     if (requested <= 0) throw new HttpError(422, "Enter a valid positive amount.");
     if (sourceRemainingSafetyCheck(prevSource, requested)) throw new HttpError(422, `Amount would make source budget negative (remaining: ₹${prevSource.toLocaleString("en-IN")})`);
     const guardrails = calculateTransfer(prevSource, num(source.necessary_future_spend), num(source.safety_reserve), Math.max(0, num(target.allocated_amount) - prevTarget), num(source.policy_maximum_transfer));
-    const error = validateCustomAmount(requested, guardrails.source_surplus, guardrails.target_funding_gap, num(source.policy_maximum_transfer));
-    if (error) throw new HttpError(422, error);
-    const { error: updateError } = await supabase.from("recommendations").update({ amount: requested, status: "modified", approved_at: appTime }).eq("organization_id", org_id).eq("id", recId).eq("status", "pending");
+    const validationError = validateCustomAmount(requested, guardrails.source_surplus, guardrails.target_funding_gap, num(source.policy_maximum_transfer));
+    if (validationError) throw new HttpError(422, validationError);
+    const nextApprovals = [...tierApprovals, newApproval];
+    const { error: updateError } = await supabase.from("recommendations").update({ amount: requested, status: "modified", tier_approvals: nextApprovals, approved_at: appTime }).eq("organization_id", org_id).eq("id", recId).eq("status", "pending");
     if (updateError) throw new HttpError(409, "Recommendation was already changed");
     await logAudit(supabase, ctx, "modify", {
       previous_source_budget: money(prevSource), new_source_budget: money(prevSource - requested),
       previous_target_budget: money(prevTarget), new_target_budget: money(prevTarget + requested),
-      original_amount: money(amount), modified_amount: requested,
+      original_amount: money(amount), modified_amount: requested, tier_level: currentLevel,
     }, recId);
     const { data: updated } = await supabase.from("recommendations").select("*").eq("organization_id", org_id).eq("id", recId).single();
-    return json(recOut(updated));
+    return json(recOut(updated, policy));
   }
 
   // ---- Audit --------------------------------------------------------------
@@ -1025,6 +1178,33 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  if (first === "organization" && seg[1] === "invitations" && seg[2] === "accept" && method === "POST") {
+    const body = await req.json();
+    const rawToken = String(body.token ?? "").trim();
+    if (!rawToken) throw new HttpError(422, "Invitation token is required");
+    const tokenHash = await hashKey(rawToken);
+    const { data: inv } = await supabase.from("organization_invitations").select("*").eq("token_hash", tokenHash).maybeSingle();
+    if (!inv) throw new HttpError(404, "Invitation not found");
+    if (inv.status !== "pending") throw new HttpError(409, `Invitation is already ${inv.status}`);
+    if (new Date(String(inv.expires_at)).getTime() < Date.now()) throw new HttpError(410, "Invitation has expired");
+    if (String(inv.email).toLowerCase() !== ctx.email.toLowerCase()) {
+      throw new HttpError(403, "This invitation was issued for a different email address");
+    }
+    const { data: existingMember } = await supabase.from("organization_members")
+      .select("user_id").eq("organization_id", inv.organization_id).eq("user_id", user_id).maybeSingle();
+    if (!existingMember) {
+      const { error: memberErr } = await supabase.from("organization_members").insert({
+        organization_id: inv.organization_id as string,
+        user_id,
+        role: inv.role as string,
+      });
+      if (memberErr) throw new HttpError(500, `Unable to join organization: ${memberErr.message}`);
+    }
+    await supabase.from("organization_invitations").update({ status: "accepted" }).eq("id", inv.id);
+    await logAudit(supabase, { ...ctx, org_id: inv.organization_id as string }, "invitation_accepted", { invitation_id: inv.id, email: inv.email, role: inv.role });
+    return json({ accepted: true, organization_id: inv.organization_id });
+  }
+
   // ---- API keys -----------------------------------------------------------
   if (first === "api-keys" && seg.length === 1 && method === "GET") {
     if (!isAdmin) throw new HttpError(403, "Organization administrator role required");
@@ -1185,7 +1365,9 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
 }
 
 // ---------------------------------------------------------------------------
-// GROQ reasoning (real AI mode). Falls back to the deterministic engine.
+// GROQ reasoning (real AI mode). Returns null only when the provider is
+// unconfigured, unreachable, or returned invalid output — the caller surfaces
+// the failure instead of falling back to fabricated reasoning.
 // ---------------------------------------------------------------------------
 async function groqReasoning(
   prompt: string,
@@ -1238,15 +1420,31 @@ async function groqReasoning(
 // ---------------------------------------------------------------------------
 // Serializers
 // ---------------------------------------------------------------------------
-function recOut(r: Record<string, unknown>) {
+function recOut(r: Record<string, unknown>, policy?: Record<string, unknown> | null) {
+  const status = String(r.status ?? "pending");
+  let escalation: { overdue: boolean; hours_overdue: number; escalate_to: string } | null = null;
+  if (policy && status === "pending") {
+    const hours = Number(policy.escalation_hours ?? 24);
+    const created = r.created_at ? new Date(String(r.created_at)).getTime() : 0;
+    if (created) {
+      const elapsed = (Date.now() - created) / 3600000;
+      if (elapsed > hours) {
+        const tiers = ((policy.tiers as { level: number; approver_roles: string[] }[]) ?? []).slice().sort((a, b) => Number(b.level) - Number(a.level));
+        const roles = tiers[0]?.approver_roles ?? [];
+        escalation = { overdue: true, hours_overdue: Math.round((elapsed - hours) * 10) / 10, escalate_to: roles[0] ?? "" };
+      }
+    }
+  }
   return {
     id: Number(r.id),
     source_line_id: Number(r.source_line_id),
     target_line_id: Number(r.target_line_id),
     amount: num(r.amount),
     confidence: num(r.confidence),
-    status: r.status,
+    status,
     rationale_json: r.rationale_json ?? {},
+    tier_approvals: Array.isArray(r.tier_approvals) ? r.tier_approvals : [],
+    escalation,
     created_at: r.created_at ?? null,
     approved_at: r.approved_at ?? null,
   };

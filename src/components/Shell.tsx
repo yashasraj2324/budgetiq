@@ -1,16 +1,50 @@
 "use client";
 import { Link, useNavigate } from "react-router-dom";
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
+import { API, apiFetch } from "@/lib/api";
 
 interface ShellProps {
   children: ReactNode;
   activePath?: string;
 }
 
+function currentPeriodLabel(calendar: { fiscal_year_start_month?: number; period_type?: string; period_labels?: string[] }): string {
+  const start = Number(calendar.fiscal_year_start_month) || 4;
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const idx = ((month - start) + 12) % 12;
+  const type = calendar.period_type ?? "quarterly";
+  if (type === "monthly") {
+    const labels = calendar.period_labels?.length === 12
+      ? calendar.period_labels
+      : ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
+    return labels[idx] ?? `M${idx + 1}`;
+  }
+  const quarter = Math.floor(idx / 3);
+  const labels = calendar.period_labels?.length ? calendar.period_labels : ["Q1", "Q2", "Q3", "Q4"];
+  return labels[quarter] ?? `Q${quarter + 1}`;
+}
+
 export function Shell({ children, activePath = "dashboard" }: ShellProps) {
   const navigate = useNavigate();
   const [userName] = useState(() => typeof window === "undefined" ? "BudgetIQ user" : sessionStorage.getItem("budgetiq_actor_name") || "BudgetIQ user");
   const [userRole] = useState(() => import.meta.env.VITE_AUTH_MODE === "dev" ? "Local developer" : "Authenticated user");
+  const [period, setPeriod] = useState<{ fiscal_year: string; label: string }>({ fiscal_year: "FY25", label: "Q3" });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [configRes, calendarRes] = await Promise.all([
+        apiFetch(`${API}/onboarding/config`).catch(() => null),
+        apiFetch(`${API}/organization/fiscal-calendar`).catch(() => null),
+      ]);
+      if (cancelled) return;
+      const config = configRes?.ok ? await configRes.json() : {};
+      const calendar = calendarRes?.ok ? await calendarRes.json() : {};
+      setPeriod({ fiscal_year: String(config.fiscal_year ?? "FY25"), label: currentPeriodLabel(calendar) });
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const signOut = () => {
     sessionStorage.removeItem("budgetiq_access_token");
@@ -152,7 +186,7 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
         {/* Footer status */}
         <div className="p-space-md border-t border-outline-variant">
           <div className="flex items-center justify-between px-space-sm py-space-xs text-outline">
-            <span className="font-code-sm text-code-sm uppercase">FY25 Q3 Active</span>
+            <span className="font-code-sm text-code-sm uppercase">{period.fiscal_year} {period.label} Active</span>
             <span className="w-2 h-2 rounded-full bg-secondary-container"></span>
           </div>
         </div>
