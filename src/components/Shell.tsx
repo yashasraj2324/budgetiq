@@ -1,5 +1,5 @@
 "use client";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ReactNode, useState } from "react";
 
 interface ShellProps {
@@ -8,8 +8,16 @@ interface ShellProps {
 }
 
 export function Shell({ children, activePath = "dashboard" }: ShellProps) {
+  const navigate = useNavigate();
   const [userName] = useState(() => typeof window === "undefined" ? "BudgetIQ user" : sessionStorage.getItem("budgetiq_actor_name") || "BudgetIQ user");
   const [userRole] = useState(() => import.meta.env.VITE_AUTH_MODE === "dev" ? "Local developer" : "Authenticated user");
+
+  const signOut = () => {
+    sessionStorage.removeItem("budgetiq_access_token");
+    sessionStorage.removeItem("budgetiq_actor_name");
+    sessionStorage.removeItem("budgetiq_remember_session");
+    navigate("/");
+  };
 
   return (
     <div className="flex h-screen w-full bg-background font-body-md text-on-surface antialiased overflow-hidden">
@@ -171,6 +179,14 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
             <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-headline-md text-[13px] tracking-tight">
               <span className="material-symbols-outlined text-[18px]">person</span>
             </div>
+            <button
+              onClick={signOut}
+              title="Sign out"
+              className="flex items-center gap-1 px-space-md py-1.5 rounded bg-surface-container-low text-outline hover:bg-surface-container hover:text-on-surface transition-colors font-body-sm text-body-sm font-medium"
+            >
+              <span className="material-symbols-outlined text-[18px]">logout</span>
+              <span className="hidden lg:inline">Sign out</span>
+            </button>
           </div>
         </header>
 
