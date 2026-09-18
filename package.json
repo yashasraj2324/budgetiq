@@ -15,7 +15,7 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.0",
     "recharts": "^3.10.1",
-    "vite-plugin-enter-dev": "^0.0.15"
+    "vite-plugin-enter-dev": "^0.0.16"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
