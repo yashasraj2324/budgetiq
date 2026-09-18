@@ -96,6 +96,17 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
               <span>Audit Log</span>
             </Link>
             <Link
+              href="/scenarios"
+              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+                activePath === "scenarios"
+                  ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
+                  : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">bookmarks</span>
+              <span>Scenarios</span>
+            </Link>
+            <Link
               href="/settings"
               className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
                 activePath === "settings"
@@ -105,6 +116,28 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
             >
               <span className="material-symbols-outlined text-[18px]">tune</span>
               <span>Settings</span>
+            </Link>
+            <Link
+              href="/governance"
+              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+                activePath === "governance"
+                  ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
+                  : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">gavel</span>
+              <span>Governance</span>
+            </Link>
+            <Link
+              href="/integrations"
+              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+                activePath === "integrations"
+                  ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
+                  : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">cable</span>
+              <span>Integrations</span>
             </Link>
           </nav>
         </div>

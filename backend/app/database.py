@@ -1,5 +1,5 @@
 import os
-from pymongo import MongoClient
+from pymongo import MongoClient, ASCENDING, DESCENDING
 from typing import Any
 
 from fastapi import Depends
@@ -13,6 +13,7 @@ MONGO_DATABASE = os.getenv("MONGO_DATABASE", "budgetiq")
 # instead of making the process fail during module import.
 client = MongoClient(MONGO_URI, connect=False, serverSelectionTimeoutMS=3000)
 db = client[MONGO_DATABASE]
+
 
 class TenantCollection:
     """Small Mongo collection facade that makes tenant filtering unavoidable."""
@@ -46,6 +47,9 @@ class TenantCollection:
             update["$setOnInsert"].setdefault("organization_id", self._organization_id)
         return self._collection.update_one(self._scope(query), update, *args, **kwargs)
 
+    def update_many(self, query: dict, update: dict, *args: Any, **kwargs: Any):
+        return self._collection.update_many(self._scope(query), update, *args, **kwargs)
+
     def insert_one(self, document: dict, *args: Any, **kwargs: Any):
         document = dict(document)
         document["organization_id"] = self._organization_id
@@ -54,6 +58,19 @@ class TenantCollection:
     def insert_many(self, documents: list[dict], *args: Any, **kwargs: Any):
         documents = [dict(d, organization_id=self._organization_id) for d in documents]
         return self._collection.insert_many(documents, *args, **kwargs)
+
+    def delete_one(self, query: dict, *args: Any, **kwargs: Any):
+        """Delete one document scoped to the authenticated organization."""
+        return self._collection.delete_one(self._scope(query), *args, **kwargs)
+
+    def delete_many(self, query: dict, *args: Any, **kwargs: Any):
+        return self._collection.delete_many(self._scope(query), *args, **kwargs)
+
+    def aggregate(self, pipeline: list, *args: Any, **kwargs: Any):
+        """Run an aggregation, prepending an org-scope match stage."""
+        org_match = {"$match": {"organization_id": self._organization_id}}
+        scoped_pipeline = [org_match] + list(pipeline)
+        return self._collection.aggregate(scoped_pipeline, *args, **kwargs)
 
     def create_index(self, *args: Any, **kwargs: Any):
         return self._collection.create_index(*args, **kwargs)
@@ -75,18 +92,84 @@ def get_db(user: AuthContext = Depends(require_auth)):
     """Return a database facade scoped to the authenticated organization."""
     return TenantDatabase(db, user)
 
-def create_tables():
-    """Create optional Mongo indexes without making startup destructive."""
-    if os.getenv("MONGO_ENSURE_INDEXES", "false").lower() not in {"1", "true", "yes"}:
+
+_TENANT_COLLECTIONS = [
+    "org_config", "departments", "budget_lines", "spend_entries",
+    "performance_scores", "recommendations", "audit_events", "billing",
+    "billing_events", "api_keys", "memberships", "invitations",
+    "approval_policies", "forecasts", "scenarios", "jobs",
+    "_notification_log", "fiscal_calendar",
+]
+
+
+def create_tables() -> None:
+    """Create production-required indexes idempotently.
+
+    Called at startup — always runs in any environment (not opt-in).
+    A best-effort try/except in the caller prevents database unavailability
+    from breaking liveness, but indexes are always attempted.
+    """
+    ensure = os.getenv("MONGO_ENSURE_INDEXES", "true").lower() not in {"0", "false", "no"}
+    if not ensure:
         return
-    for collection in ("org_config", "departments", "budget_lines", "spend_entries",
-                       "performance_scores", "recommendations", "audit_events", "billing",
-                       "billing_events", "api_keys", "memberships", "invitations",
-                       "approval_policies", "forecasts"):
-        db[collection].create_index([("organization_id", 1), ("id", 1)], unique=True)
-        db[collection].create_index("organization_id")
-    db.spend_entries.create_index("budget_line_id")
-    db.recommendations.create_index("status")
-    db.audit_events.create_index([("organization_id", 1), ("recommendation_id", 1), ("timestamp", -1)])
-    db.billing_events.create_index([("event_id", 1)], unique=True)
-    db.api_keys.create_index([("key_hash", 1)], unique=True)
+
+    for collection in _TENANT_COLLECTIONS:
+        try:
+            db[collection].create_index(
+                [("organization_id", ASCENDING), ("id", ASCENDING)],
+                unique=False,
+                background=True,
+            )
+            db[collection].create_index(
+                [("organization_id", ASCENDING)], background=True
+            )
+        except Exception:
+            pass  # collection may not exist yet
+
+    # Specific indexes for performance-critical queries
+    try:
+        db.spend_entries.create_index(
+            [("organization_id", ASCENDING), ("budget_line_id", ASCENDING)], background=True
+        )
+        db.recommendations.create_index(
+            [("organization_id", ASCENDING), ("status", ASCENDING)], background=True
+        )
+        db.recommendations.create_index(
+            [("organization_id", ASCENDING), ("approval_state", ASCENDING)], background=True
+        )
+        db.audit_events.create_index(
+            [("organization_id", ASCENDING), ("recommendation_id", ASCENDING), ("timestamp", DESCENDING)],
+            background=True,
+        )
+        db.billing_events.create_index(
+            [("event_id", ASCENDING)], unique=True, background=True
+        )
+        db.api_keys.create_index(
+            [("key_hash", ASCENDING)], unique=True, background=True
+        )
+        db.api_keys.create_index(
+            [("organization_id", ASCENDING), ("revoked_at", ASCENDING)], background=True
+        )
+        db.invitations.create_index(
+            [("token_hash", ASCENDING)], background=True
+        )
+        db.scenarios.create_index(
+            [("organization_id", ASCENDING), ("created_by", ASCENDING)], background=True
+        )
+        db.jobs.create_index(
+            [("status", ASCENDING), ("next_retry_at", ASCENDING)], background=True
+        )
+        db["_notification_log"].create_index(
+            [("key", ASCENDING)], unique=True, background=True
+        )
+    except Exception:
+        pass
+
+
+def check_database_ready() -> bool:
+    """Ping MongoDB and return True if reachable, False otherwise."""
+    try:
+        db.command("ping")
+        return True
+    except Exception:
+        return False

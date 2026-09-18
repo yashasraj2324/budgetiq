@@ -15,9 +15,8 @@ import os
 import time
 import secrets
 from dataclasses import dataclass
-from fastapi import Request
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 
@@ -67,14 +66,24 @@ def _jwt_context(token: str) -> AuthContext:
     ).digest()
     if not hmac.compare_digest(expected, _decode_segment(parts[2])):
         raise HTTPException(401, "Invalid access token")
-    if claims.get("exp") is not None and float(claims["exp"]) <= time.time():
+
+    if claims.get("exp") is None:
+        raise HTTPException(401, "Access token missing expiry")
+    if float(claims["exp"]) <= time.time():
         raise HTTPException(401, "Access token expired")
+
+    configured_issuer = _setting("AUTH_JWT_ISSUER")
+    if configured_issuer and claims.get("iss") != configured_issuer:
+        raise HTTPException(401, "Invalid access token issuer")
+
     configured_audience = _setting("AUTH_JWT_AUDIENCE")
     if configured_audience and claims.get("aud") != configured_audience:
         raise HTTPException(401, "Invalid access token audience")
+
     metadata = claims.get("app_metadata")
     if not isinstance(metadata, dict):
         metadata = {}
+
     user_id = str(claims.get("sub") or "")
     organization_id = str(
         claims.get("organization_id")
@@ -84,11 +93,23 @@ def _jwt_context(token: str) -> AuthContext:
     )
     if not user_id or not organization_id:
         raise HTTPException(403, "Access token has no organization membership")
-    role = str(
-        claims.get("role")
-        or metadata.get("role")
-        or "finance_user"
+
+    token_role = str(claims.get("role") or metadata.get("role") or "")
+
+    from .database import db as raw_db
+
+    membership = raw_db.memberships.find_one(
+        {
+            "organization_id": organization_id,
+            "user_id": user_id,
+            "status": "active",
+        }
     )
+    if not membership:
+        raise HTTPException(403, "Access token has no active organization membership")
+
+    role = str(membership.get("role") or token_role or "finance_user")
+
     return AuthContext(
         user_id=user_id,
         organization_id=organization_id,
@@ -111,6 +132,7 @@ def generate_api_key(prefix: str = "biq") -> tuple[str, str]:
 
 def _api_key_context(value: str) -> AuthContext | None:
     from .database import db
+
     record = db.api_keys.find_one({"key_hash": hash_api_key(value), "revoked_at": None})
     if not record:
         return None
@@ -135,19 +157,68 @@ def _api_key_context(value: str) -> AuthContext | None:
 def _dev_context(token: str | None) -> AuthContext:
     if _setting("BUDGETIQ_ENV", "development").lower() == "production":
         raise HTTPException(503, "Production authentication must use JWT")
-    expected = _setting("BUDGETIQ_DEV_AUTH_TOKEN", "local-dev-token")
+
+    expected = _setting("BUDGETIQ_DEV_AUTH_TOKEN")
+    if not expected:
+        raise HTTPException(503, "BUDGETIQ_DEV_AUTH_TOKEN must be configured in development")
     if not token or not hmac.compare_digest(token, expected):
         raise HTTPException(401, "Bearer authentication required")
-    organization_id = _setting("BUDGETIQ_DEV_ORGANIZATION_ID", "local-demo")
+
+    organization_id = _setting("BUDGETIQ_DEV_ORGANIZATION_ID")
     if not organization_id:
         raise HTTPException(503, "Development organization is not configured")
+
     return AuthContext(
-        user_id=_setting("BUDGETIQ_DEV_USER_ID", "local-developer"),
+        user_id=_setting("BUDGETIQ_DEV_USER_ID") or "dev-user",
         organization_id=organization_id,
-        role=_setting("BUDGETIQ_DEV_ROLE", "VP Finance"),
-        display_name=_setting("BUDGETIQ_DEV_DISPLAY_NAME", "Local Developer"),
+        role=_setting("BUDGETIQ_DEV_ROLE") or "VP Finance",
+        display_name=_setting("BUDGETIQ_DEV_DISPLAY_NAME") or "Development User",
         auth_mode="dev",
     )
+
+
+def _scope_allowed(user: AuthContext, required_scope: str) -> bool:
+    return "*" in user.scopes or required_scope in user.scopes
+
+
+def _required_scope_for_request(request: Request) -> str | None:
+    path = request.url.path
+    method = request.method.upper()
+    write = method in {"POST", "PUT", "PATCH", "DELETE"}
+
+    if path.startswith("/api/health") or path == "/api/metrics":
+        return None
+    if path in {"/api/auth/sign-out", "/api/auth/password-reset"}:
+        return None
+
+    if path.startswith("/api/api-keys"):
+        return "api_keys:manage"
+    if path.startswith("/api/billing"):
+        return "billing:write" if write else "billing:read"
+    if path.startswith("/api/scenarios"):
+        return "scenarios:write" if write else "scenarios:read"
+    if path.startswith("/api/governance") or path.startswith("/api/organization"):
+        return "organization:write" if write else "organization:read"
+    if path.startswith("/api/recommendations"):
+        if path.endswith("/approve") or path.endswith("/modify") or path.endswith("/reject"):
+            return "approvals:write"
+        if path.endswith("/approval-state"):
+            return "approvals:read"
+        return "recommendations:write" if write else "recommendations:read"
+    if path.startswith("/api/audit") or path.startswith("/api/reports") or path.startswith("/api/export") or path.endswith(".csv"):
+        return "reports:read"
+    if (
+        path.startswith("/api/budget-lines")
+        or path.startswith("/api/departments")
+        or path.startswith("/api/dashboard")
+        or path.startswith("/api/onboarding")
+        or path.startswith("/api/anomalies")
+        or path.startswith("/api/signals")
+        or path.startswith("/api/providers/status")
+    ):
+        return "budgets:write" if write else "budgets:read"
+
+    return "organization:write" if write else "organization:read"
 
 
 def require_auth(
@@ -159,8 +230,12 @@ def require_auth(
         if api_key:
             context = _api_key_context(api_key)
             if context:
+                required_scope = _required_scope_for_request(request)
+                if required_scope and not _scope_allowed(context, required_scope):
+                    raise HTTPException(403, f"API key scope '{required_scope}' required")
                 return context
             raise HTTPException(401, "Invalid or revoked API key")
+
     mode = _setting(
         "BUDGETIQ_AUTH_MODE",
         "jwt" if _setting("BUDGETIQ_ENV", "development").lower() == "production" else "dev",
@@ -194,4 +269,5 @@ def require_scope(scope: str):
         if "*" not in user.scopes and scope not in user.scopes:
             raise HTTPException(403, f"API key scope '{scope}' required")
         return user
+
     return dependency

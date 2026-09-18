@@ -1,6 +1,6 @@
 """
-Qwen reasoning service using pydantic-ai.
-Sends structured financial evidence → gets structured QwenReasoning back.
+Groq reasoning service using pydantic-ai.
+Sends structured financial evidence -> gets structured QwenReasoning back.
 Logfire instruments every call automatically via pydantic-ai integration.
 """
 import os
@@ -12,14 +12,14 @@ from ..models import QwenReasoning
 
 logger = logging.getLogger(__name__)
 
-# ponytail: single agent instance — no factory, no DI container
-_api_key = os.getenv("QWEN_API_KEY", "").strip()
+# Single agent instance - no factory, no DI container
+_api_key = os.getenv("GROQ_API_KEY", "").strip()
 _agent: Agent[None, QwenReasoning] | None = None
-if _api_key and _api_key.lower() not in {"your-qwen-key-here", "dummy_key_for_testing"}:
+if _api_key and _api_key.lower() not in {"your-groq-key-here", "dummy_key_for_testing"}:
     _model = OpenAIChatModel(
-        os.getenv("QWEN_MODEL", "qwen-plus"),
+        os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile"),
         provider=OpenAIProvider(
-            base_url=os.getenv("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+            base_url=os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1"),
             api_key=_api_key,
         ),
     )
@@ -30,7 +30,7 @@ if _api_key and _api_key.lower() not in {"your-qwen-key-here", "dummy_key_for_te
             "You are a financial analyst assistant. "
             "Given structured evidence about a budget reallocation, produce a clear, "
             "step-by-step reasoning trace for a finance manager. "
-            "Be concise. Do not invent numbers — only use the evidence provided. "
+            "Be concise. Do not invent numbers - only use the evidence provided. "
             "Your confidence score reflects how well the evidence supports the recommendation."
         ),
     )
@@ -41,15 +41,15 @@ Budget reallocation evidence:
 SOURCE BUDGET LINE: {source_name}
   Priority score: {source_priority}/100
   Performance score: {source_performance}/100
-  Remaining budget: ₹{remaining_budget:,.0f}
+  Remaining budget: ?{remaining_budget:,.0f}
   Spend velocity anomaly: {velocity_multiplier}x acceleration detected
 
 TARGET BUDGET LINE: {target_name}
   Priority score: {target_priority}/100
   Performance score: {target_performance}/100
-  Funding gap: ₹{target_funding_gap:,.0f}
+  Funding gap: ?{target_funding_gap:,.0f}
 
-CALCULATED TRANSFER (deterministic engine): ₹{transfer:,.0f}
+CALCULATED TRANSFER (deterministic engine): ?{transfer:,.0f}
 Capped by: {capped_by}
 
 Generate a recommendation with 6 reasoning steps, a confidence score, and a
@@ -94,13 +94,10 @@ async def get_reasoning(
     try:
         result = await _agent.run(prompt)
         output = result.output
-        output.explanation_source = "qwen"
+        output.explanation_source = "groq"
         return output
     except Exception:
-        # A recommendation remains usable when the optional AI provider is
-        # unavailable; all financial numbers still come from the deterministic
-        # engine and the fallback is explicitly traceable in the UI.
-        logger.warning("Qwen reasoning unavailable; using deterministic fallback", exc_info=True)
+        logger.warning("Groq reasoning unavailable; using deterministic fallback", exc_info=True)
         return _fallback_reasoning(
             source_name, target_name, velocity_multiplier, target_priority,
             transfer, capped_by,
@@ -117,16 +114,16 @@ def _fallback_reasoning(
 ) -> QwenReasoning:
     return QwenReasoning(
         recommendation=(
-            f"Transfer ₹{transfer:,.0f} from {source_name} to {target_name}; "
+            f"Transfer ?{transfer:,.0f} from {source_name} to {target_name}; "
             "AI provider unavailable, so this deterministic explanation is shown."
         ),
         reasoning_steps=[
-            {"step": 1, "label": "Anomaly Detection", "detail": f"Observed spend velocity is {velocity_multiplier}× the baseline."},
+            {"step": 1, "label": "Anomaly Detection", "detail": f"Observed spend velocity is {velocity_multiplier}x the baseline."},
             {"step": 2, "label": "Priority Review", "detail": f"Target priority is {target_priority}/100."},
             {"step": 3, "label": "Guardrail Calculation", "detail": f"Transfer is capped by {capped_by}."},
-            {"step": 4, "label": "Funding Decision", "detail": f"Deterministic engine calculated ₹{transfer:,.0f}."},
+            {"step": 4, "label": "Funding Decision", "detail": f"Deterministic engine calculated ?{transfer:,.0f}."},
             {"step": 5, "label": "Human Approval", "detail": "No budget is moved without an explicit approval action."},
-            {"step": 6, "label": "AI Availability", "detail": "Configure QWEN_API_KEY to replace this fallback with Qwen reasoning."},
+            {"step": 6, "label": "AI Availability", "detail": "Configure GROQ_API_KEY to replace this fallback with Groq reasoning."},
         ],
         confidence=0.5,
         validated_transfer=transfer,

@@ -16,16 +16,21 @@ from ..models import (
     AnomalyOut, GenerateRequest, ApproveRequest, ModifyRequest, RejectRequest,
     RecommendationOut, RecommendationStatus, SpendEntryOut, PerformanceScoreOut,
     PolicyUpdateRequest, OnboardingDataRequest, OnboardingPrioritiesRequest,
-    OnboardingPoliciesRequest, MembershipOut, MembershipUpdate, InvitationCreate,
+    OnboardingPoliciesRequest, MembershipOut, MembershipUpdate, InvitationCreate, InvitationOut,
     ApprovalPolicyIn, ApprovalPolicyOut, ApiKeyCreate, ApiKeyOut, KNOWN_ACTORS, PageOut,
-    OrganizationConfigOut, OrganizationConfigUpdate, ForecastOut, ForecastPointOut
+    OrganizationConfigOut, OrganizationConfigUpdate, ForecastOut, ForecastPointOut,
+    ForecastBacktestOut, ScenarioIn, ScenarioUpdate, ScenarioOut, ScenarioFilters,
+    FiscalCalendarIn, FiscalCalendarOut,
 )
 from ..services.anomaly import detect_velocity_anomaly
 from ..services.engine import GuardrailResult, calculate_transfer, validate_custom_amount
 from ..services.qwen import get_reasoning
-from ..services.forecast import forecast_spend
+from ..services.forecast import forecast_spend, forecast_provenance, backtest_forecast, is_insufficient
+from ..services.approval_engine import can_approve, can_reject, check_escalation, build_tier_approval_entry, ApprovalState
 from ..providers import configured_provider_status
+from ..config import get_settings
 from ..services.stripe_billing import stripe_request, stripe_get, verify_webhook
+from .. import monitoring
 
 router = APIRouter(prefix="/api")
 
@@ -73,7 +78,8 @@ def health_ready():
 
 @router.get("/metrics")
 def metrics():
-    return StreamingResponse(iter(["budgetiq_health 1\n"]), media_type="text/plain; version=0.0.4")
+    from ..monitoring import metrics_text
+    return StreamingResponse(iter([metrics_text()]), media_type="text/plain; version=0.0.4")
 
 
 @router.get("/providers/status")
@@ -84,6 +90,15 @@ def provider_status(db: Database = Depends(get_db)):
 
 @router.get("/billing")
 def billing_status(db: Database = Depends(get_db), user: AuthContext = Depends(require_admin)):
+    settings = get_settings()
+    if not settings.billing_enabled:
+        return {
+            "status": "deferred",
+            "plan": "deferred",
+            "customer_id": None,
+            "subscription_id": None,
+            "message": "Billing deferred for this milestone",
+        }
     subscription = db.billing.find_one({"organization_id": user.organization_id}) or {
         "status": "not_configured", "plan": "free", "customer_id": None, "subscription_id": None
     }
@@ -97,6 +112,8 @@ def create_checkout_session(
     user: AuthContext = Depends(require_admin),
     db: Database = Depends(get_db),
 ):
+    if not get_settings().billing_enabled:
+        raise HTTPException(503, "Billing deferred for this milestone")
     price_id = os.getenv("STRIPE_PRICE_ID", "").strip()
     if not price_id:
         raise HTTPException(503, "STRIPE_PRICE_ID is not configured")
@@ -110,6 +127,8 @@ def create_checkout_session(
         "line_items[0][quantity]": "1",
         "client_reference_id": user.organization_id,
         "metadata[organization_id]": user.organization_id,
+        "automatic_tax[enabled]": "true",
+        "tax_id_collection[enabled]": "true",
     }
     if customer_id:
         data["customer"] = customer_id
@@ -120,6 +139,8 @@ def create_checkout_session(
 
 @router.post("/billing/portal")
 def create_billing_portal(return_url: str, user: AuthContext = Depends(require_admin), db: Database = Depends(get_db)):
+    if not get_settings().billing_enabled:
+        raise HTTPException(503, "Billing deferred for this milestone")
     billing = db.billing.find_one({})
     if not billing or not billing.get("customer_id"):
         raise HTTPException(409, "No Stripe customer is configured for this organization")
@@ -129,6 +150,18 @@ def create_billing_portal(return_url: str, user: AuthContext = Depends(require_a
 
 @router.get("/billing/entitlements")
 def billing_entitlements(user: AuthContext = Depends(require_admin), db: Database = Depends(get_db)):
+    if not get_settings().billing_enabled:
+        return {
+            "plan": "deferred",
+            "active": False,
+            "features": {
+                "csv_import": True,
+                "recommendations": True,
+                "erp_sync": False,
+                "dual_sign": False,
+            },
+            "message": "Billing deferred for this milestone",
+        }
     billing = db.billing.find_one({}) or {}
     status = billing.get("status", "not_configured")
     plan = billing.get("plan", "free")
@@ -146,6 +179,8 @@ def billing_entitlements(user: AuthContext = Depends(require_admin), db: Databas
 
 @router.get("/billing/invoices")
 def billing_invoices(user: AuthContext = Depends(require_admin), db: Database = Depends(get_db)):
+    if not get_settings().billing_enabled:
+        return {"data": []}
     billing = db.billing.find_one({})
     if not billing or not billing.get("customer_id"):
         return {"data": []}
@@ -154,9 +189,12 @@ def billing_invoices(user: AuthContext = Depends(require_admin), db: Database = 
 
 @router.post("/billing/webhook")
 async def stripe_webhook(request: Request, stripe_signature: str | None = Header(None, alias="Stripe-Signature")):
+    if not get_settings().billing_enabled:
+        return {"received": True, "handled": False, "deferred": True}
     if not stripe_signature:
         raise HTTPException(400, "Stripe-Signature header is required")
     event = verify_webhook(await request.body(), stripe_signature)
+    monitoring.increment("budgetiq_webhook_events_total", {"type": event.get("type", "unknown")})
     event_type = event.get("type", "")
     obj = event.get("data", {}).get("object", {})
     metadata = obj.get("metadata", {}) if isinstance(obj, dict) else {}
@@ -164,12 +202,13 @@ async def stripe_webhook(request: Request, stripe_signature: str | None = Header
     if not organization_id:
         return {"received": True, "handled": False}
     from ..database import db as raw_db
-    billing = raw_db["billing"]
+    billing_col = raw_db["billing"]
     events = raw_db["billing_events"]
     if event.get("id") and events.find_one({"event_id": event["id"]}):
         return {"received": True, "handled": True, "duplicate": True}
     if event.get("id"):
-        events.insert_one({"event_id": event["id"], "organization_id": organization_id, "received_at": datetime.now(timezone.utc)})
+        events.insert_one({"event_id": event["id"], "organization_id": organization_id,
+                           "event_type": event_type, "received_at": datetime.now(timezone.utc)})
     update = {"last_event_id": event.get("id"), "updated_at": datetime.now(timezone.utc)}
     if event_type == "checkout.session.completed":
         update.update({"status": "active", "customer_id": obj.get("customer"), "subscription_id": obj.get("subscription")})
@@ -177,14 +216,34 @@ async def stripe_webhook(request: Request, stripe_signature: str | None = Header
         update.update({"status": obj.get("status"), "subscription_id": obj.get("id"), "customer_id": obj.get("customer")})
     elif event_type == "customer.subscription.deleted":
         update.update({"status": "canceled", "subscription_id": obj.get("id")})
+    elif event_type == "invoice.payment_failed":
+        update.update({"status": "past_due", "last_invoice_id": obj.get("id")})
+        from ..services.background_jobs import enqueue_job
+        enqueue_job(
+            raw_db, "billing_notification", organization_id,
+            payload={"event_type": "payment_failed", "invoice_id": obj.get("id")},
+            idempotency_key=f"billing_notify_{event.get('id', '')}",
+        )
+    elif event_type == "invoice.paid":
+        update.update({"status": "active", "last_invoice_id": obj.get("id")})
+    elif event_type == "customer.subscription.trial_will_end":
+        from ..services.background_jobs import enqueue_job
+        enqueue_job(
+            raw_db, "billing_notification", organization_id,
+            payload={"event_type": "trial_will_end", "trial_end": obj.get("trial_end")},
+            idempotency_key=f"trial_end_{event.get('id', '')}",
+        )
+        return {"received": True, "handled": True}
     else:
         return {"received": True, "handled": False}
-    billing.update_one({"organization_id": organization_id}, {"$set": update, "$setOnInsert": {"organization_id": organization_id}}, upsert=True)
+    billing_col.update_one(
+        {"organization_id": organization_id},
+        {"$set": update, "$setOnInsert": {"organization_id": organization_id}},
+        upsert=True,
+    )
     return {"received": True, "handled": True}
 
-
-# ---------------------------------------------------------------------------
-# Helpers
+# ---------------------------------------------------------------------------`n# Helpers
 # ---------------------------------------------------------------------------
 
 def get_next_id(db: Database, coll: str) -> int:
@@ -389,8 +448,7 @@ def set_approval_policy(req: ApprovalPolicyIn, db: Database = Depends(get_db),
 @router.post("/api-keys", response_model=ApiKeyOut, status_code=201)
 def create_api_key(req: ApiKeyCreate, db: Database = Depends(get_db),
                    user: AuthContext = Depends(require_admin)):
-    if any(scope not in {"read", "write", "admin"} for scope in req.scopes):
-        raise HTTPException(422, "Unsupported API key scope")
+    # Scope validation is performed by ApiKeyCreate.validate_scopes Pydantic validator
     raw, digest = generate_api_key()
     now = datetime.now(timezone.utc)
     expires = now + timedelta(days=req.expires_in_days) if req.expires_in_days else None
@@ -400,7 +458,8 @@ def create_api_key(req: ApiKeyCreate, db: Database = Depends(get_db),
             "expires_at": expires, "revoked_at": None}
     db.api_keys.insert_one(item)
     _governance_audit(db, user, "api_key_created", api_key_id=item["id"], scopes=item["scopes"])
-    return ApiKeyOut(**{k: item.get(k) for k in ("id", "name", "scopes", "expires_at", "revoked_at", "created_at")}, key=raw)
+    status = "active"
+    return ApiKeyOut(**{k: item.get(k) for k in ("id", "name", "scopes", "expires_at", "revoked_at", "created_at")}, key=raw, status=status)
 
 
 @router.get("/api-keys", response_model=list[ApiKeyOut])
@@ -819,6 +878,14 @@ def approve(
 ):
     actor = _validate_actor(req.actor, user)
     rec = _get_pending(rec_id, db)
+
+    # Enforce approval state machine
+    policy = db.approval_policies.find_one({}) or {}
+    decision = can_approve(rec, policy, user.user_id, user.role, user.display_name)
+    if not decision.allowed:
+        monitoring.increment("budgetiq_approval_transitions_total", {"action": "approve", "outcome": "denied"})
+        raise HTTPException(403, decision.reason)
+
     source = db.budget_lines.find_one({"id": rec["source_line_id"]})
     target = db.budget_lines.find_one({"id": rec["target_line_id"]})
     if not source or not target:
@@ -826,51 +893,66 @@ def approve(
 
     prev_src = _live_remaining(db, source)
     prev_tgt = _live_remaining(db, target)
-
     amount = _money(rec.get("amount"))
-    if prev_src < amount:
-        raise HTTPException(422, f"Approval would make source budget negative (remaining: ₹{prev_src:,.2f}, amount: ₹{amount:,.2f})")
+
+    next_state = decision.next_state
     app_time = datetime.now(timezone.utc)
+
+    # Only move money when fully approved
+    if next_state in (ApprovalState.approved, ApprovalState.modified):
+        if prev_src < amount:
+            raise HTTPException(422, f"Approval would make source budget negative (remaining: ₹{prev_src:,.2f}, amount: ₹{amount:,.2f})")
+
+    tier_entry = build_tier_approval_entry(decision.required_tier, user.user_id, user.role, user.display_name, "approve")
+    history_entry = {"from_state": rec.get("approval_state", "pending"), "to_state": next_state.value,
+                     "actor_user_id": user.user_id, "actor_role": user.role,
+                     "actor_display_name": user.display_name, "timestamp": app_time, "reason": ""}
+
+    final_status = RecommendationStatus.approved.value if next_state == ApprovalState.approved else rec.get("status", "pending")
     claimed = db.recommendations.update_one(
-        {"id": rec_id, "status": RecommendationStatus.pending.value},
-        {"$set": {"status": RecommendationStatus.approved.value, "approved_at": app_time}},
+        {"id": rec_id, "status": {"$in": [RecommendationStatus.pending.value, "awaiting_tier_2", "awaiting_dual_sign"]}},
+        {"$set": {"status": final_status, "approval_state": next_state.value,
+                  "approved_at": app_time if next_state == ApprovalState.approved else None},
+         "$push": {"tier_approvals": tier_entry, "approval_history": history_entry}},
     )
     if claimed.modified_count != 1:
         raise HTTPException(409, "Recommendation was already changed")
-    if not _reserve_source(db, source["id"], amount):
-        db.recommendations.update_one(
-            {"id": rec_id, "status": RecommendationStatus.approved.value},
-            {"$set": {"status": RecommendationStatus.pending.value, "approved_at": None}},
-        )
-        raise HTTPException(422, "Approval would make source budget negative")
-    if not _credit_target(db, target["id"], amount):
-        db.budget_lines.update_one(
-            {"id": source["id"]},
-            {"$inc": {"remaining_budget": _persisted_amount(amount)}},
-        )
-        db.recommendations.update_one(
-            {"id": rec_id, "status": RecommendationStatus.approved.value},
-            {"$set": {"status": RecommendationStatus.pending.value, "approved_at": None}},
-        )
-        raise HTTPException(409, "Unable to reserve target budget")
 
+    if next_state == ApprovalState.approved:
+        if not _reserve_source(db, source["id"], amount):
+            db.recommendations.update_one(
+                {"id": rec_id, "approval_state": next_state.value},
+                {"$set": {"status": RecommendationStatus.pending.value, "approval_state": ApprovalState.pending.value, "approved_at": None}},
+            )
+            raise HTTPException(422, "Approval would make source budget negative")
+        if not _credit_target(db, target["id"], amount):
+            db.budget_lines.update_one({"id": source["id"]}, {"$inc": {"remaining_budget": _persisted_amount(amount)}})
+            db.recommendations.update_one(
+                {"id": rec_id, "approval_state": next_state.value},
+                {"$set": {"status": RecommendationStatus.pending.value, "approval_state": ApprovalState.pending.value, "approved_at": None}},
+            )
+            raise HTTPException(409, "Unable to reserve target budget")
+
+    monitoring.increment("budgetiq_approval_transitions_total", {"action": "approve", "outcome": next_state.value})
     db.audit_events.insert_one({
         "id": get_next_id(db, "audit_events"),
         "recommendation_id": rec_id,
-        "action": "approve",
+        "action": f"approve_tier_{decision.required_tier}",
         "actor": actor,
         "event_metadata": _audit_metadata(
             user,
             previous_source=prev_src,
-            new_source=prev_src - amount,
+            new_source=prev_src - amount if next_state == ApprovalState.approved else prev_src,
             previous_target=prev_tgt,
-            new_target=prev_tgt + amount,
+            new_target=prev_tgt + amount if next_state == ApprovalState.approved else prev_tgt,
             amount=_persisted_amount(amount),
+            next_state=next_state.value,
         ),
-        "timestamp": app_time
+        "timestamp": app_time,
     })
-    rec["status"] = RecommendationStatus.approved.value
-    rec["approved_at"] = app_time
+    rec.update({"status": final_status, "approval_state": next_state.value, "approved_at": app_time if next_state == ApprovalState.approved else None})
+    rec.setdefault("tier_approvals", [])
+    rec.setdefault("approval_history", [])
     return RecommendationOut(**rec)
 
 
@@ -992,7 +1074,14 @@ def reject(
 ):
     actor = _validate_actor(req.actor, user)
     rec = _get_pending(rec_id, db)
-    # FIX: fetch real budget values even on rejection (no money moves, but audit is truthful)
+
+    # Enforce approval state machine — any authorised approver can reject at any tier
+    policy = db.approval_policies.find_one({}) or {}
+    decision = can_reject(rec, policy, user.user_id, user.role)
+    if not decision.allowed:
+        monitoring.increment("budgetiq_approval_transitions_total", {"action": "reject", "outcome": "denied"})
+        raise HTTPException(403, decision.reason)
+
     source = db.budget_lines.find_one({"id": rec["source_line_id"]})
     target = db.budget_lines.find_one({"id": rec["target_line_id"]})
     if not source or not target:
@@ -1001,12 +1090,17 @@ def reject(
     current_tgt = _live_remaining(db, target)
 
     app_time = datetime.now(timezone.utc)
+    history_entry = {"from_state": rec.get("approval_state", "pending"), "to_state": ApprovalState.rejected.value,
+                     "actor_user_id": user.user_id, "actor_role": user.role,
+                     "actor_display_name": user.display_name, "timestamp": app_time, "reason": req.reason}
     claimed = db.recommendations.update_one(
-        {"id": rec_id, "status": RecommendationStatus.pending.value},
-        {"$set": {"status": RecommendationStatus.rejected.value}},
+        {"id": rec_id, "status": {"$in": [RecommendationStatus.pending.value, "awaiting_tier_2", "awaiting_dual_sign"]}},
+        {"$set": {"status": RecommendationStatus.rejected.value, "approval_state": ApprovalState.rejected.value},
+         "$push": {"approval_history": history_entry}},
     )
     if claimed.modified_count != 1:
         raise HTTPException(409, "Recommendation was already changed")
+    monitoring.increment("budgetiq_approval_transitions_total", {"action": "reject", "outcome": "rejected"})
     db.audit_events.insert_one({
         "id": get_next_id(db, "audit_events"),
         "recommendation_id": rec_id,
@@ -1021,9 +1115,12 @@ def reject(
             reason=req.reason,
             amount=_persisted_amount(_money(rec["amount"])),
         ),
-        "timestamp": app_time
+        "timestamp": app_time,
     })
     rec["status"] = RecommendationStatus.rejected.value
+    rec["approval_state"] = ApprovalState.rejected.value
+    rec.setdefault("tier_approvals", [])
+    rec.setdefault("approval_history", [])
     return RecommendationOut(**rec)
 
 
@@ -1330,3 +1427,257 @@ def export_budget_lines(
             "policy_maximum_transfer": detail.get("policy_maximum_transfer", 0),
         })
     return _csv_response(rows, "budgetiq_budget_lines.csv")
+
+
+# ---------------------------------------------------------------------------
+# Approval state query and escalation (new)
+# ---------------------------------------------------------------------------
+
+@router.get("/recommendations/{rec_id}/approval-state")
+def get_approval_state(rec_id: int, db: Database = Depends(get_db),
+                       user: AuthContext = Depends(require_auth)):
+    rec = db.recommendations.find_one({"id": rec_id})
+    if not rec:
+        raise HTTPException(404, "Recommendation not found")
+    policy = db.approval_policies.find_one({}) or {}
+    escalation = check_escalation(rec, policy)
+    return {
+        "id": rec_id,
+        "approval_state": rec.get("approval_state", rec.get("status", "pending")),
+        "status": rec.get("status", "pending"),
+        "tier_approvals": rec.get("tier_approvals", []),
+        "approval_history": rec.get("approval_history", []),
+        "escalation": {"overdue": escalation.overdue, "hours_overdue": escalation.hours_overdue,
+                       "escalate_to": escalation.escalate_to} if escalation.overdue else None,
+    }
+
+
+@router.post("/recommendations/{rec_id}/escalate", status_code=200)
+def escalate_recommendation(rec_id: int, db: Database = Depends(get_db),
+                             user: AuthContext = Depends(require_admin)):
+    """Operator-level escalation override — marks recommendation for priority review."""
+    rec = db.recommendations.find_one({"id": rec_id})
+    if not rec:
+        raise HTTPException(404, "Recommendation not found")
+    from .routes import FINAL_STATES  # noqa: circular guard
+    if rec.get("approval_state", rec.get("status")) in {"approved", "rejected", "expired", "cancelled", "modified"}:
+        raise HTTPException(409, "Cannot escalate a finalised recommendation")
+    now = datetime.now(timezone.utc)
+    db.recommendations.update_one({"id": rec_id}, {"$set": {"escalated": True, "escalated_at": now,
+                                                              "escalated_by": user.user_id}})
+    _record_setup_audit(db, user, "recommendation_escalated", recommendation_id=rec_id)
+    return {"escalated": True, "recommendation_id": rec_id}
+
+
+# ---------------------------------------------------------------------------
+# Forecast backtest (new)
+# ---------------------------------------------------------------------------
+
+@router.get("/budget-lines/{line_id}/forecast/backtest", response_model=ForecastBacktestOut)
+def get_forecast_backtest(
+    line_id: int,
+    holdout: int = Query(2, ge=1, le=10),
+    db: Database = Depends(get_db),
+):
+    if not db.budget_lines.find_one({"id": line_id}):
+        raise HTTPException(404, "Budget line not found")
+    entries = list(db.spend_entries.find({"budget_line_id": line_id}).sort("period", 1))
+    result = backtest_forecast(entries, holdout)
+    if result is None:
+        raise HTTPException(422, f"Insufficient data for backtest (need at least {3 + holdout} data points)")
+    # Persist governance record
+    record = dict(result, budget_line_id=line_id)
+    db["forecasts"].insert_one(record)  # type: ignore[attr-defined]
+    return ForecastBacktestOut(**result)
+
+
+# ---------------------------------------------------------------------------
+# Saved scenarios (new)
+# ---------------------------------------------------------------------------
+
+@router.post("/scenarios", response_model=ScenarioOut, status_code=201)
+def create_scenario(req: ScenarioIn, db: Database = Depends(get_db),
+                    user: AuthContext = Depends(require_auth)):
+    now = datetime.now(timezone.utc)
+    doc = {
+        "id": get_next_id(db, "scenarios"),
+        "name": req.name.strip(),
+        "organization_id": user.organization_id,
+        "created_by": user.user_id,
+        "filters": req.filters.model_dump(),
+        "shared": req.shared,
+        "created_at": now,
+        "updated_at": now,
+    }
+    db.scenarios.insert_one(doc)
+    return ScenarioOut(**doc)
+
+
+@router.get("/scenarios", response_model=list[ScenarioOut])
+def list_scenarios(
+    page: int | None = Query(None),
+    page_size: int | None = Query(None),
+    db: Database = Depends(get_db),
+    user: AuthContext = Depends(require_auth),
+):
+    all_scenarios = [ScenarioOut(**{**s, "filters": ScenarioFilters(**s.get("filters", {}))})
+                     for s in db.scenarios.find({})]
+    return _page(all_scenarios, page, page_size)
+
+
+@router.get("/scenarios/{scenario_id}", response_model=ScenarioOut)
+def get_scenario(scenario_id: int, db: Database = Depends(get_db),
+                 user: AuthContext = Depends(require_auth)):
+    s = db.scenarios.find_one({"id": scenario_id})
+    if not s:
+        raise HTTPException(404, "Scenario not found")
+    return ScenarioOut(**{**s, "filters": ScenarioFilters(**s.get("filters", {}))})
+
+
+@router.patch("/scenarios/{scenario_id}", response_model=ScenarioOut)
+def update_scenario(scenario_id: int, req: ScenarioUpdate, db: Database = Depends(get_db),
+                    user: AuthContext = Depends(require_auth)):
+    s = db.scenarios.find_one({"id": scenario_id})
+    if not s:
+        raise HTTPException(404, "Scenario not found")
+    if s.get("created_by") != user.user_id and user.role != "admin":
+        raise HTTPException(403, "Only the creator or an admin can edit this scenario")
+    updates: dict = {"updated_at": datetime.now(timezone.utc)}
+    if req.name is not None:
+        updates["name"] = req.name.strip()
+    if req.filters is not None:
+        updates["filters"] = req.filters.model_dump()
+    if req.shared is not None:
+        if req.shared and user.role != "admin":
+            raise HTTPException(403, "Only admins can share scenarios organisation-wide")
+        updates["shared"] = req.shared
+    db.scenarios.update_one({"id": scenario_id}, {"$set": updates})
+    s.update(updates)
+    return ScenarioOut(**{**s, "filters": ScenarioFilters(**s.get("filters", {}))})
+
+
+@router.delete("/scenarios/{scenario_id}", status_code=204)
+def delete_scenario(scenario_id: int, db: Database = Depends(get_db),
+                    user: AuthContext = Depends(require_auth)):
+    s = db.scenarios.find_one({"id": scenario_id})
+    if not s:
+        raise HTTPException(404, "Scenario not found")
+    if s.get("created_by") != user.user_id and user.role != "admin":
+        raise HTTPException(403, "Only the creator or an admin can delete this scenario")
+    db.scenarios.delete_one({"id": scenario_id})
+
+
+@router.post("/scenarios/{scenario_id}/duplicate", response_model=ScenarioOut, status_code=201)
+def duplicate_scenario(scenario_id: int, db: Database = Depends(get_db),
+                       user: AuthContext = Depends(require_auth)):
+    s = db.scenarios.find_one({"id": scenario_id})
+    if not s:
+        raise HTTPException(404, "Scenario not found")
+    now = datetime.now(timezone.utc)
+    copy = {**s, "id": get_next_id(db, "scenarios"), "name": s["name"] + " (copy)",
+            "created_by": user.user_id, "shared": False, "created_at": now, "updated_at": now}
+    copy.pop("_id", None)
+    db.scenarios.insert_one(copy)
+    return ScenarioOut(**{**copy, "filters": ScenarioFilters(**copy.get("filters", {}))})
+
+
+@router.post("/scenarios/{scenario_id}/share", status_code=200)
+def share_scenario(scenario_id: int, db: Database = Depends(get_db),
+                   user: AuthContext = Depends(require_admin)):
+    s = db.scenarios.find_one({"id": scenario_id})
+    if not s:
+        raise HTTPException(404, "Scenario not found")
+    db.scenarios.update_one({"id": scenario_id}, {"$set": {"shared": True, "updated_at": datetime.now(timezone.utc)}})
+    return {"shared": True, "scenario_id": scenario_id}
+
+
+# ---------------------------------------------------------------------------
+# Fiscal calendar (new)
+# ---------------------------------------------------------------------------
+
+@router.get("/organization/fiscal-calendar", response_model=FiscalCalendarOut)
+def get_fiscal_calendar(db: Database = Depends(get_db), user: AuthContext = Depends(require_auth)):
+    cal = db.fiscal_calendar.find_one({}) or {
+        "organization_id": user.organization_id,
+        "fiscal_year_start_month": 1,
+        "period_type": "quarterly",
+        "period_labels": ["Q1", "Q2", "Q3", "Q4"],
+    }
+    return FiscalCalendarOut(**cal)
+
+
+@router.put("/organization/fiscal-calendar", response_model=FiscalCalendarOut)
+def set_fiscal_calendar(req: FiscalCalendarIn, db: Database = Depends(get_db),
+                        user: AuthContext = Depends(require_admin)):
+    now = datetime.now(timezone.utc)
+    doc = {**req.model_dump(), "organization_id": user.organization_id, "updated_at": now}
+    db.fiscal_calendar.update_one({}, {"$set": doc}, upsert=True)
+    _record_setup_audit(db, user, "fiscal_calendar_updated", **req.model_dump())
+    return FiscalCalendarOut(**doc)
+
+
+# ---------------------------------------------------------------------------
+# Member deactivation and invitation management (new)
+# ---------------------------------------------------------------------------
+
+@router.delete("/organization/members/{member_id}", status_code=204)
+def deactivate_member(member_id: str, db: Database = Depends(get_db),
+                      user: AuthContext = Depends(require_admin)):
+    if member_id == user.user_id:
+        raise HTTPException(400, "You cannot deactivate your own account")
+    result = db.memberships.update_one(
+        {"user_id": member_id, "status": "active"},
+        {"$set": {"status": "deactivated", "deactivated_at": datetime.now(timezone.utc),
+                  "deactivated_by": user.user_id}},
+    )
+    if result.modified_count != 1:
+        raise HTTPException(404, "Active member not found")
+    _governance_audit(db, user, "member_deactivated", member_id=member_id)
+
+
+@router.post("/organization/members/{member_id}/resend-invitation", status_code=200)
+def resend_invitation(member_id: str, db: Database = Depends(get_db),
+                      user: AuthContext = Depends(require_admin)):
+    invitation = db.invitations.find_one({"id": int(member_id)} if member_id.isdigit()
+                                          else {"email": member_id, "status": "pending"})
+    if not invitation:
+        raise HTTPException(404, "Pending invitation not found")
+    # Extend expiry and generate new token
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    db.invitations.update_one(
+        {"id": invitation["id"]},
+        {"$set": {"token_hash": hash_api_key(token),
+                  "expires_at": now.timestamp() + 7 * 86400,
+                  "resent_at": now, "resent_by": user.user_id}},
+    )
+    return {"resent": True, "invitation_id": invitation["id"], "token": token}
+
+
+@router.get("/organization/invitations", response_model=list[InvitationOut])
+def list_invitations(db: Database = Depends(get_db), user: AuthContext = Depends(require_auth)):
+    invitations = list(db.invitations.find({"status": "pending"}))
+    now_ts = datetime.now(timezone.utc).timestamp()
+    result = []
+    for inv in invitations:
+        status = "pending" if float(inv.get("expires_at", 0)) > now_ts else "expired"
+        result.append(InvitationOut(
+            id=inv["id"], email=inv.get("email", ""), role=inv.get("role", ""),
+            status=status, created_at=inv.get("created_at", datetime.now(timezone.utc)),
+            expires_at=datetime.fromtimestamp(float(inv["expires_at"]), tz=timezone.utc) if inv.get("expires_at") else None,
+            invited_by=str(inv.get("created_by", "")),
+        ))
+    return result
+
+
+@router.delete("/organization/invitations/{invitation_id}", status_code=204)
+def cancel_invitation(invitation_id: int, db: Database = Depends(get_db),
+                      user: AuthContext = Depends(require_admin)):
+    result = db.invitations.update_one(
+        {"id": invitation_id, "status": "pending"},
+        {"$set": {"status": "cancelled", "cancelled_at": datetime.now(timezone.utc),
+                  "cancelled_by": user.user_id}},
+    )
+    if result.modified_count != 1:
+        raise HTTPException(404, "Pending invitation not found")
+    _governance_audit(db, user, "invitation_cancelled", invitation_id=invitation_id)

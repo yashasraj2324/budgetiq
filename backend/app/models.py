@@ -50,6 +50,26 @@ class AnomalyOut(BaseModel):
     baseline_rate: float
     period_remaining: int
 
+class TierApprovalOut(BaseModel):
+    tier_level: int
+    actor_user_id: str
+    actor_role: str
+    actor_display_name: str = ""
+    approved_at: datetime
+    action: str = "approve"
+
+
+class ApprovalHistoryEntry(BaseModel):
+    from_state: str
+    to_state: str
+    actor_user_id: str
+    actor_role: str
+    actor_display_name: str = ""
+    timestamp: datetime
+    reason: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class RecommendationOut(BaseModel):
     id: int
     source_line_id: int
@@ -57,9 +77,12 @@ class RecommendationOut(BaseModel):
     amount: float
     rationale_json: dict[str, Any]
     status: RecommendationStatus
+    approval_state: str = "pending"
     confidence: float
     created_at: datetime
     approved_at: datetime | None = None
+    tier_approvals: list[TierApprovalOut] = Field(default_factory=list)
+    approval_history: list[ApprovalHistoryEntry] = Field(default_factory=list)
     model_config = {"from_attributes": True}
 
 class GenerateRequest(BaseModel):
@@ -345,6 +368,23 @@ class ForecastOut(BaseModel):
     horizon: int
     points: list[ForecastPointOut]
     method: str = "linear_trend"
+    insufficient_data: bool = False
+    algorithm_version: str = "linear_trend_v1"
+    provenance: dict[str, Any] | None = None
+
+
+class ForecastBacktestOut(BaseModel):
+    algorithm: str
+    holdout_periods: int
+    n: int
+    mae: float
+    rmse: float
+    mape_percent: float | None = None
+    mape_unavailable_reason: str | None = None
+    actuals: list[float]
+    predictions: list[float]
+    review_status: str = "pending"
+    generated_at: str
 
 class AuditEventOut(BaseModel):
     id: int
@@ -381,7 +421,7 @@ class QwenReasoning(BaseModel):
     # Optional echo from the provider. When present it must match the
     # deterministic engine; the API never uses this value to move money.
     validated_transfer: Decimal | None = None
-    explanation_source: str = "qwen"
+    explanation_source: str = "groq"
     @model_validator(mode="after")
     def confidence_range(self) -> "QwenReasoning":
         if not 0.0 <= self.confidence <= 1.0:
@@ -427,10 +467,32 @@ class ApprovalPolicyOut(ApprovalPolicyIn):
     model_config = {"from_attributes": True}
 
 
+# Full scope catalogue — used for validation in ApiKeyCreate
+ALL_SCOPES = frozenset({
+    "budgets:read", "budgets:write",
+    "recommendations:read", "recommendations:write",
+    "approvals:read", "approvals:write",
+    "reports:read",
+    "organization:read", "organization:write",
+    "billing:read", "billing:write",
+    "api_keys:manage",
+    "scenarios:read", "scenarios:write",
+    "*",  # wildcard — grants all scopes (admin API keys only)
+})
+
+
 class ApiKeyCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    scopes: list[str] = Field(default_factory=lambda: ["read"])
+    scopes: list[str] = Field(default_factory=lambda: ["budgets:read"], min_length=1)
     expires_in_days: int | None = Field(default=None, ge=1, le=3650)
+
+    @field_validator("scopes")
+    @classmethod
+    def validate_scopes(cls, v: list[str]) -> list[str]:
+        invalid = [s for s in v if s not in ALL_SCOPES]
+        if invalid:
+            raise ValueError(f"Unknown scopes: {invalid!r}. Valid: {sorted(ALL_SCOPES)}")
+        return v
 
 
 class ApiKeyOut(BaseModel):
@@ -440,4 +502,75 @@ class ApiKeyOut(BaseModel):
     expires_at: datetime | None = None
     revoked_at: datetime | None = None
     created_at: datetime
-    key: str | None = None
+    key: str | None = None  # cleartext — returned once on creation only
+    status: str = "active"  # active | revoked | expired
+
+
+# ---------------------------------------------------------------------------
+# Saved Scenarios
+# ---------------------------------------------------------------------------
+
+class ScenarioFilters(BaseModel):
+    department_id: int | None = None
+    category: str | None = None
+    search: str | None = None
+    status: str | None = None
+    date_from: str | None = None
+    date_to: str | None = None
+    scenario_type: str | None = None
+
+
+class ScenarioIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    filters: ScenarioFilters = Field(default_factory=ScenarioFilters)
+    shared: bool = False
+
+
+class ScenarioUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    filters: ScenarioFilters | None = None
+    shared: bool | None = None
+
+
+class ScenarioOut(BaseModel):
+    id: int
+    name: str
+    organization_id: str
+    created_by: str
+    filters: ScenarioFilters
+    shared: bool = False
+    created_at: datetime
+    updated_at: datetime | None = None
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# Fiscal Calendar
+# ---------------------------------------------------------------------------
+
+class FiscalCalendarIn(BaseModel):
+    fiscal_year_start_month: int = Field(ge=1, le=12, default=1)
+    period_type: str = Field(default="quarterly", pattern=r"^(monthly|quarterly|custom)$")
+    period_labels: list[str] = Field(default_factory=lambda: ["Q1", "Q2", "Q3", "Q4"])
+
+
+class FiscalCalendarOut(FiscalCalendarIn):
+    organization_id: str
+    updated_at: datetime | None = None
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# Invitations
+# ---------------------------------------------------------------------------
+
+class InvitationOut(BaseModel):
+    id: int
+    email: str
+    role: str
+    status: str = "pending"  # pending | accepted | cancelled | expired
+    created_at: datetime
+    expires_at: datetime | None = None
+    invited_by: str = ""
+    model_config = {"from_attributes": True}
+

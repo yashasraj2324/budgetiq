@@ -26,14 +26,14 @@ def test_governance_models_validate_tiers_and_expiry():
         escalation_hours=48,
     )
     assert policy.dual_sign is True
-    key = ApiKeyCreate(name="ERP sync", scopes=["read", "write"], expires_in_days=30)
+    key = ApiKeyCreate(name="ERP sync", scopes=["budgets:read", "budgets:write"], expires_in_days=30)
     assert key.expires_in_days == 30
     invitation = InvitationCreate(email="user@example.com", role="finance_user")
     assert invitation.email == "user@example.com"
 
 
 def test_scope_dependency_allows_wildcard_and_rejects_missing_scope():
-    allowed = require_scope("read")(AuthContext("u", "o", "finance_user", "U", "api_key", frozenset({"read"})))
+    allowed = require_scope("budgets:read")(AuthContext("u", "o", "finance_user", "U", "api_key", frozenset({"budgets:read"})))
     assert allowed.user_id == "u"
     with pytest.raises(HTTPException):
-        require_scope("write")(AuthContext("u", "o", "finance_user", "U", "api_key", frozenset({"read"})))
+        require_scope("budgets:write")(AuthContext("u", "o", "finance_user", "U", "api_key", frozenset({"budgets:read"})))
