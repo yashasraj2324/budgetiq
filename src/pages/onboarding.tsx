@@ -21,7 +21,7 @@ export default function OnboardingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          org_name: fd.get("org_name") || "BudgetIQ Demo Org",
+          org_name: fd.get("org_name") || "My Organization",
           fiscal_year: fd.get("financial_year") || "FY 2025",
           currency: fd.get("base_currency") || "INR",
           departments: [],
@@ -60,7 +60,7 @@ export default function OnboardingPage() {
           </div>
           <div className="flex items-center space-x-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span className="font-medium text-slate-600">Private beta security controls</span>
+            <span className="font-medium text-slate-600">Enterprise security controls</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <span className="material-symbols-outlined text-[16px] text-slate-400">person</span>

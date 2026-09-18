@@ -12,7 +12,7 @@ export default function ResetPasswordPage() {
     const url = import.meta.env.VITE_SUPABASE_URL;
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     if (!url || !anonKey) {
-      setMessage("Supabase password recovery is not configured.");
+      setMessage("Enter Cloud password recovery is not configured.");
       return;
     }
     fetch(`${url}/auth/v1/recover`, {

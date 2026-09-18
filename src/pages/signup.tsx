@@ -1,11 +1,68 @@
 "use client";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { FormEvent, useState } from "react";
 
 export default function SignupPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
+
+  const signUp = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setInfo("");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!url || !anonKey) {
+      setError("Enter Cloud authentication is not configured.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const response = await fetch(`${url}/auth/v1/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: anonKey },
+        body: JSON.stringify({
+          email,
+          password,
+          email_redirect_to: `${window.location.origin}/`,
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(body.error_description ?? body.msg ?? "Sign-up failed.");
+        return;
+      }
+      if (body.access_token) {
+        sessionStorage.setItem("budgetiq_access_token", body.access_token);
+        sessionStorage.setItem("budgetiq_actor_name", email.split("@")[0]);
+        navigate("/dashboard");
+        return;
+      }
+      setInfo("Account created. A confirmation email may be required before you can sign in.");
+    } catch {
+      setError("Unable to reach the authentication service.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-space-lg">
       <div className="w-full max-w-md bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-space-xl">
-        
+
         {/* Brand Header */}
         <div className="flex flex-col items-center justify-center text-center mb-space-xl">
           <div className="flex items-center gap-space-xs mb-space-sm">
@@ -13,22 +70,70 @@ export default function SignupPage() {
             <span className="font-headline-xl text-headline-xl text-on-surface tracking-tight">BudgetIQ</span>
             <span className="w-2 h-2 rounded-full bg-primary-container mt-1.5"></span>
           </div>
-          <h1 className="font-headline-md text-headline-md text-on-surface">Request Access</h1>
+          <h1 className="font-headline-md text-headline-md text-on-surface">Create your account</h1>
           <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
-            Join your organization&apos;s Ledger Workspace
+            Set up your Ledger Workspace
           </p>
         </div>
 
-        <div className="space-y-space-md">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            Account provisioning is managed by your organization&apos;s
-            configured Supabase provider. This private-beta shell does not
-            create accounts or collect passwords.
+        {/* Signup Form */}
+        <form className="space-y-space-lg" onSubmit={signUp}>
+          <div className="space-y-1">
+            <label className="block font-body-sm text-body-sm font-semibold text-on-surface">
+              Work Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full h-10 px-space-md bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container transition-colors focus:outline-none focus:border-primary-container font-body-md text-on-surface"
+              placeholder="alex.rivera@company.com"
+              required
+            />
           </div>
-          <Link to="/" className="w-full h-10 bg-primary-container hover:bg-primary text-on-primary font-body-md font-semibold rounded flex items-center justify-center gap-space-xs mt-space-lg">
-            Return to sign in
-          </Link>
-        </div>
+
+          <div className="space-y-1">
+            <label className="block font-body-sm text-body-sm font-semibold text-on-surface">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full h-10 px-space-md bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container transition-colors focus:outline-none focus:border-primary-container font-body-md text-on-surface"
+              placeholder="At least 8 characters"
+              minLength={8}
+              required
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block font-body-sm text-body-sm font-semibold text-on-surface">
+              Confirm Password
+            </label>
+            <input
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              className="w-full h-10 px-space-md bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container transition-colors focus:outline-none focus:border-primary-container font-body-md text-on-surface"
+              placeholder="Repeat your password"
+              minLength={8}
+              required
+            />
+          </div>
+
+          {error && <p className="text-sm text-error" role="alert">{error}</p>}
+          {info && <p className="text-sm text-primary" role="status">{info}</p>}
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full h-10 bg-primary-container hover:bg-primary active:bg-on-primary-fixed-variant text-on-primary font-body-md text-body-md font-semibold rounded shadow-sm transition-colors duration-150 flex items-center justify-center gap-space-xs mt-space-md cursor-pointer disabled:opacity-50"
+          >
+            <span>{submitting ? "Creating account…" : "Create Account"}</span>
+            <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
+          </button>
+        </form>
 
         {/* Footer */}
         <div className="mt-space-xl pt-space-md border-t border-outline-variant text-center">

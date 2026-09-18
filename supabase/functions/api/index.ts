@@ -75,18 +75,46 @@ async function resolveAuth(req: Request, supabase: ReturnType<typeof createClien
   // Real JWT path only — dev-mode bearer tokens are no longer accepted.
   const { data: userData, error: userError } = await supabase.auth.getUser(token);
   if (userError || !userData.user) throw new HttpError(401, "Invalid access token");
-  const { data: membership } = await supabase
-    .from("organization_members")
-    .select("organization_id, role")
-    .eq("user_id", userData.user.id)
-    .maybeSingle();
-  if (!membership) throw new HttpError(403, "Access token has no active organization membership");
+  const userEmail = userData.user.email ?? "";
+  const userDisplay = (userData.user.user_metadata?.display_name as string) || userEmail.split("@")[0] || "User";
+
+  // Resolve the user's organization. A brand-new signup has no membership yet:
+  // provision a personal workspace so onboarding can proceed immediately.
+  let orgId: string;
+  let role: string;
+  {
+    const { data: membership } = await supabase
+      .from("organization_members")
+      .select("organization_id, role")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+    if (membership) {
+      orgId = membership.organization_id as string;
+      role = (membership.role as string) || "finance_user";
+    } else {
+      const { data: newOrg, error: orgErr } = await supabase
+        .from("organizations")
+        .insert({ name: `${userDisplay}'s Workspace`, fiscal_year: "FY25", currency: "INR" })
+        .select("id")
+        .single();
+      if (orgErr) throw new HttpError(500, `Unable to provision workspace: ${orgErr.message}`);
+      const { error: memberErr } = await supabase.from("organization_members").insert({
+        organization_id: newOrg.id,
+        user_id: userData.user.id,
+        role: "admin",
+      });
+      if (memberErr) throw new HttpError(500, `Unable to provision membership: ${memberErr.message}`);
+      orgId = newOrg.id as string;
+      role = "admin";
+    }
+  }
+
   return {
     user_id: userData.user.id,
-    org_id: membership.organization_id as string,
-    role: (membership.role as string) || "finance_user",
-    display_name: (userData.user.user_metadata?.display_name as string) || userData.user.email || userData.user.id,
-    email: userData.user.email ?? "",
+    org_id: orgId,
+    role,
+    display_name: userDisplay,
+    email: userEmail,
   };
 }
 
