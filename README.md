@@ -30,14 +30,13 @@ The API runs at `http://localhost:8000`.
 ### Frontend
 
 ```powershell
-cd frontend
-copy .env.example .env.local
-npm ci
-npm run dev
+pnpm install
+pnpm dev
 ```
 
-Set `NEXT_PUBLIC_API_URL` to the backend URL including `/api`
-(for example `http://localhost:8000/api`).
+The Vite dev server runs at `http://localhost:3000` and proxies `/api` to the
+backend at `http://localhost:8000`. No separate frontend env is needed for a
+local run; VITE_* values are read from the root `.env` (see `.env.example`).
 
 ## Authentication and tenant safety
 
@@ -52,16 +51,8 @@ Set `NEXT_PUBLIC_API_URL` to the backend URL including `/api`
 
 ```powershell
 python -m pytest -q
-cd frontend
-npm run lint
-npm run build
-```
-
-Optional E2E command (kept separate from production build):
-
-```powershell
-cd frontend
-npm run e2e
+pnpm lint
+pnpm build
 ```
 
 ## Configuration
