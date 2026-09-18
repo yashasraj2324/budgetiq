@@ -8,17 +8,9 @@ export const API = (
   "https://spb-t4n36368isizplpp.supabase.opentrust.net/functions/v1/api"
 ).replace(/\/+$/, "");
 
-const authMode = (import.meta.env.VITE_AUTH_MODE ?? "dev").toLowerCase();
-
-// Local-dev fallback (mirrors BUDGETIQ_DEV_AUTH_TOKEN); overridden by VITE_DEV_AUTH_TOKEN when set.
-const DEV_FALLBACK_TOKEN = "dev-token-for-local";
-
 export function accessToken(): string | null {
   if (typeof window === "undefined") return null;
-  const stored = window.sessionStorage.getItem("budgetiq_access_token");
-  if (stored) return stored;
-  if (authMode === "dev") return import.meta.env.VITE_DEV_AUTH_TOKEN ?? DEV_FALLBACK_TOKEN;
-  return null;
+  return window.sessionStorage.getItem("budgetiq_access_token");
 }
 
 export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {

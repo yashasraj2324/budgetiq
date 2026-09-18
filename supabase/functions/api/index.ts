@@ -9,9 +9,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DEV_TOKEN = "dev-token-for-local"; // mirrors the frontend dev-mode fallback token
-const DEMO_ORG_NAME = "BudgetIQ Demo Org";
-const DEMO_EMAIL = "demo@budgetiq.app";
+const DEV_TOKEN_DISABLED = ""; // dev-mode bearer tokens are no longer accepted
 const ADMIN_ROLES = new Set(["admin", "CFO", "VP Finance"]);
 const APPROVER_ROLES = new Set(["admin", "CFO", "VP Finance", "Finance Manager", "Controller"]);
 const SUPPORTED_ROLES = [
@@ -74,22 +72,7 @@ async function resolveAuth(req: Request, supabase: ReturnType<typeof createClien
   const token = authz.startsWith("Bearer ") ? authz.slice(7).trim() : null;
   if (!token) throw new HttpError(401, "Bearer authentication required");
 
-  if (token === DEV_TOKEN) {
-    const { data: org } = await supabase
-      .from("organizations").select("id").eq("name", DEMO_ORG_NAME).maybeSingle();
-    if (!org) throw new HttpError(503, "Demo organization has not been seeded");
-    const { data: users } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-    const demo = users?.users.find((u) => u.email === DEMO_EMAIL);
-    return {
-      user_id: demo?.id ?? "demo-user",
-      org_id: org.id as string,
-      role: "VP Finance",
-      display_name: "Local Developer",
-      email: demo?.email ?? DEMO_EMAIL,
-    };
-  }
-
-  // Real JWT path
+  // Real JWT path only — dev-mode bearer tokens are no longer accepted.
   const { data: userData, error: userError } = await supabase.auth.getUser(token);
   if (userError || !userData.user) throw new HttpError(401, "Invalid access token");
   const { data: membership } = await supabase
@@ -661,24 +644,51 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
 
     const transfer = money(guardrails.transfer);
     const priorityGap = Number(target.priority_weight) - Number(source.priority_weight);
-    const confidence = Math.round(Math.min(0.96, Math.max(0.62, 0.7 + priorityGap / 500 + (anomaly.detected ? 0.06 : 0))) * 100) / 100;
+    const deterministicConfidence = Math.round(Math.min(0.96, Math.max(0.62, 0.7 + priorityGap / 500 + (anomaly.detected ? 0.06 : 0))) * 100) / 100;
 
-    const rationale = {
-      recommendation:
-        `Transfer ₹${transfer.toLocaleString("en-IN")} from ${source.name} to ${target.name}. ` +
-        `${source.name} shows a ${anomaly.velocity_multiplier.toFixed(1)}× spend velocity anomaly with priority ${source.priority_weight}/100, ` +
-        `while ${target.name} is underfunded against a priority ${target.priority_weight}/100 commitment.`,
-      reasoning_steps: [
-        { step: 1, label: "Anomaly Detection", detail: anomaly.detected ? `${source.name} spend velocity is ${anomaly.velocity_multiplier.toFixed(1)}× the baseline, triggering the threshold breach alert.` : `${source.name} shows no significant velocity anomaly; reallocation is driven by priority and surplus.` },
-        { step: 2, label: "Priority Scoring", detail: `${source.name} priority is ${source.priority_weight}/100 vs ${target.name} at ${target.priority_weight}/100 — a ${Math.abs(priorityGap)}-point gap.` },
-        { step: 3, label: "Surplus Calculation", detail: `Source surplus = ₹${sourceRemaining.toLocaleString("en-IN")} remaining − ₹${num(source.necessary_future_spend).toLocaleString("en-IN")} future − ₹${num(source.safety_reserve).toLocaleString("en-IN")} reserve = ₹${Math.max(0, guardrails.source_surplus).toLocaleString("en-IN")} transferable.` },
-        { step: 4, label: "Funding Gap Analysis", detail: `${target.name} funding gap is ₹${targetFundingGap.toLocaleString("en-IN")}.` },
-        { step: 5, label: "Guardrail Validation", detail: `Transfer of ₹${transfer.toLocaleString("en-IN")} is within all guardrails (capped by ${guardrails.capped_by}).` },
-        { step: 6, label: "Confidence Assessment", detail: `Confidence ${(confidence * 100).toFixed(0)}%: ${anomaly.detected ? "strong anomaly signal" : "priority differential"} and clean guardrail pass.` },
-      ],
-      confidence,
-      rejection_consequence: `If rejected, ${target.name} remains underfunded while ${source.name} continues its current spend trajectory.`,
-    };
+    const evidencePrompt =
+      `Budget reallocation evidence:\n\n` +
+      `SOURCE BUDGET LINE: ${source.name}\n  Priority score: ${source.priority_weight}/100\n  Performance score: ${srcPerf ? num(srcPerf.score) : 50}/100\n  Remaining budget: ₹${sourceRemaining.toLocaleString("en-IN")}\n  Spend velocity anomaly: ${anomaly.velocity_multiplier}x acceleration detected\n\n` +
+      `TARGET BUDGET LINE: ${target.name}\n  Priority score: ${target.priority_weight}/100\n  Performance score: ${tgtPerf ? num(tgtPerf.score) : 50}/100\n  Funding gap: ₹${targetFundingGap.toLocaleString("en-IN")}\n\n` +
+      `CALCULATED TRANSFER (deterministic engine): ₹${transfer.toLocaleString("en-IN")}\nCapped by: ${guardrails.capped_by}\n\n` +
+      `Generate a recommendation with 6 reasoning steps, a confidence score, and a one-sentence estimated consequence if this recommendation is rejected. ` +
+      `If you echo the calculated transfer, put the exact provided value in validated_transfer. Never recalculate or change that value.`;
+
+    const groq = await groqReasoning(evidencePrompt, transfer);
+    let rationale: Record<string, unknown>;
+    let confidence = deterministicConfidence;
+    if (groq && Math.abs(Number(groq.validated_transfer) - transfer) < 1) {
+      confidence = Math.min(1, Math.max(0, Number(groq.confidence) || deterministicConfidence));
+      rationale = {
+        recommendation: String(groq.recommendation),
+        reasoning_steps: (groq.reasoning_steps as { step: number; label: string; detail: string }[]).map((s) => ({
+          step: Number(s.step), label: String(s.label), detail: String(s.detail),
+        })),
+        confidence,
+        rejection_consequence: String(groq.rejection_consequence ?? ""),
+        validated_transfer: transfer,
+        explanation_source: "groq",
+      };
+    } else {
+      rationale = {
+        recommendation:
+          `Transfer ₹${transfer.toLocaleString("en-IN")} from ${source.name} to ${target.name}. ` +
+          `${source.name} shows a ${anomaly.velocity_multiplier.toFixed(1)}× spend velocity anomaly with priority ${source.priority_weight}/100, ` +
+          `while ${target.name} is underfunded against a priority ${target.priority_weight}/100 commitment.`,
+        reasoning_steps: [
+          { step: 1, label: "Anomaly Detection", detail: anomaly.detected ? `${source.name} spend velocity is ${anomaly.velocity_multiplier.toFixed(1)}× the baseline, triggering the threshold breach alert.` : `${source.name} shows no significant velocity anomaly; reallocation is driven by priority and surplus.` },
+          { step: 2, label: "Priority Scoring", detail: `${source.name} priority is ${source.priority_weight}/100 vs ${target.name} at ${target.priority_weight}/100 — a ${Math.abs(priorityGap)}-point gap.` },
+          { step: 3, label: "Surplus Calculation", detail: `Source surplus = ₹${sourceRemaining.toLocaleString("en-IN")} remaining − ₹${num(source.necessary_future_spend).toLocaleString("en-IN")} future − ₹${num(source.safety_reserve).toLocaleString("en-IN")} reserve = ₹${Math.max(0, guardrails.source_surplus).toLocaleString("en-IN")} transferable.` },
+          { step: 4, label: "Funding Gap Analysis", detail: `${target.name} funding gap is ₹${targetFundingGap.toLocaleString("en-IN")}.` },
+          { step: 5, label: "Guardrail Validation", detail: `Transfer of ₹${transfer.toLocaleString("en-IN")} is within all guardrails (capped by ${guardrails.capped_by}).` },
+          { step: 6, label: "Confidence Assessment", detail: `Confidence ${(confidence * 100).toFixed(0)}%: ${anomaly.detected ? "strong anomaly signal" : "priority differential"} and clean guardrail pass.` },
+        ],
+        confidence,
+        rejection_consequence: `If rejected, ${target.name} remains underfunded while ${source.name} continues its current spend trajectory.`,
+        validated_transfer: transfer,
+        explanation_source: "deterministic_fallback",
+      };
+    }
 
     const { data: created, error } = await supabase.from("recommendations").insert({
       organization_id: org_id,
@@ -1144,6 +1154,57 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
   }
 
   throw new HttpError(404, "Not found");
+}
+
+// ---------------------------------------------------------------------------
+// GROQ reasoning (real AI mode). Falls back to the deterministic engine.
+// ---------------------------------------------------------------------------
+async function groqReasoning(
+  prompt: string,
+  transfer: number,
+): Promise<{ recommendation: string; reasoning_steps: unknown[]; confidence: number; rejection_consequence: string; validated_transfer: number } | null> {
+  const apiKey = Deno.env.get("GROQ_API_KEY") ?? "";
+  if (!apiKey || apiKey.toLowerCase() === "your-groq-key-here") return null;
+  const model = Deno.env.get("GROQ_MODEL") ?? "openai/gpt-oss-120b";
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a financial analyst assistant. Given structured evidence about a budget reallocation, produce a clear, step-by-step reasoning trace for a finance manager. Be concise. Do not invent numbers - only use the evidence provided. Respond ONLY with a JSON object matching this schema: {recommendation: string, reasoning_steps: [{step: number, label: string, detail: string}], confidence: number, rejection_consequence: string, validated_transfer: number}. Never recalculate or change the provided transfer value.",
+          },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      console.error("groq request failed:", res.status, await res.text().catch(() => ""));
+      return null;
+    }
+    const data = await res.json();
+    const text: string = data?.choices?.[0]?.message?.content ?? "";
+    const parsed = JSON.parse(text);
+    if (!parsed || typeof parsed !== "object" || typeof parsed.recommendation !== "string" || !Array.isArray(parsed.reasoning_steps) || parsed.reasoning_steps.length < 1) {
+      return null;
+    }
+    return {
+      recommendation: parsed.recommendation,
+      reasoning_steps: parsed.reasoning_steps,
+      confidence: Number(parsed.confidence) || 0.5,
+      rejection_consequence: typeof parsed.rejection_consequence === "string" ? parsed.rejection_consequence : "",
+      validated_transfer: Number(parsed.validated_transfer),
+    };
+  } catch (err) {
+    console.error("groq reasoning failed:", err instanceof Error ? err.message : String(err));
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------

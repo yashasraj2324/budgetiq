@@ -4,9 +4,6 @@ import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function LoginPage() {
-  const authMode = (import.meta.env.VITE_AUTH_MODE ?? "dev").toLowerCase();
-  // Local-dev fallback (mirrors the backend BUDGETIQ_DEV_AUTH_TOKEN).
-  const devToken = import.meta.env.VITE_DEV_AUTH_TOKEN ?? "dev-token-for-local";
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [password, setPassword] = useState("");
@@ -14,32 +11,24 @@ export default function LoginPage() {
 
   const signIn = async (event: FormEvent) => {
     event.preventDefault();
-    if (authMode === "dev") {
-      if (!devToken) {
-      setError("Development auth is not configured. Set VITE_DEV_AUTH_TOKEN.");
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!url || !anonKey) {
+      setError("Enter Cloud authentication is not configured.");
       return;
-      }
-      sessionStorage.setItem("budgetiq_access_token", devToken);
-    } else {
-      const url = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      if (!url || !anonKey) {
-        setError("Supabase authentication is not configured.");
-        return;
-      }
-      const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: anonKey },
-        body: JSON.stringify({ email, password }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        setError(body.error_description ?? body.msg ?? "Sign-in failed.");
-        return;
-      }
-      const session = await response.json();
-      sessionStorage.setItem("budgetiq_access_token", session.access_token);
     }
+    const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: anonKey },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      setError(body.error_description ?? body.msg ?? "Sign-in failed.");
+      return;
+    }
+    const session = await response.json();
+    sessionStorage.setItem("budgetiq_access_token", session.access_token);
     if (email) sessionStorage.setItem("budgetiq_actor_name", email.split("@")[0]);
     navigate("/dashboard");
   };
@@ -59,11 +48,6 @@ export default function LoginPage() {
           <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
             Enterprise FP&amp;A Ledger Engine
           </p>
-          {authMode === "dev" && (
-            <p className="mt-2 text-xs text-amber-700">
-              Local development authentication; email and password are not sent.
-            </p>
-          )}
         </div>
 
         {/* Login Form */}

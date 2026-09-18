@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { RechartsChart } from "@/components/RechartsChart";
 import { Shell } from "@/components/Shell";
-import { API, apiFetch } from "@/lib/api";
+import { API, apiError, apiFetch } from "@/lib/api";
 
 interface BudgetLineRow {
   id: number;
@@ -30,15 +30,10 @@ interface DashboardData {
 
 export default function DashboardPage() {
   const [searchParams] = useSearchParams();
-  const [data, setData] = useState<DashboardData>({
-    total_budget: 25000000,
-    total_remaining: 18450000,
-    reallocatable: 1200000,
-    pending_recommendations: 3,
-    anomaly_count: 1
-  });
+  const [data, setData] = useState<DashboardData | null>(null);
   const [anomalies, setAnomalies] = useState<{ budget_line_id: number }[]>([]);
   const [syncedAt, setSyncedAt] = useState("—");
+  const [error, setError] = useState("");
 
   const params = {
     department_id: searchParams.get("department_id") ?? undefined,
@@ -61,17 +56,21 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
+    setError("");
     (async () => {
       try {
         const res = await apiFetch(`${API}/dashboard${queryString ? `?${queryString}` : ""}`);
-        if (!cancelled && res.ok) {
-          setData(await res.json());
-          setSyncedAt(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+        if (cancelled) return;
+        if (!res.ok) {
+          setError(await apiError(res, "Unable to load dashboard"));
+          return;
         }
+        setData(await res.json());
+        setSyncedAt(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
         const res2 = await apiFetch(`${API}/anomalies`);
         if (!cancelled && res2.ok) setAnomalies(await res2.json());
       } catch {
-        /* dashboard renders with fallback data if the API is unreachable */
+        if (!cancelled) setError("Unable to reach the BudgetIQ API.");
       }
     })();
     return () => { cancelled = true; };
@@ -79,6 +78,26 @@ export default function DashboardPage() {
 
   const formatCurrency = (val: number) => "₹" + (val / 100000).toFixed(1) + "L";
   const formatINR = (val: number) => "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+
+  if (error) {
+    return (
+      <Shell activePath="dashboard">
+        <div className="flex items-center justify-center h-full">
+          <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-xl text-center max-w-md">
+            <p className="font-headline-md text-on-surface">Dashboard unavailable</p>
+            <p className="font-body-sm text-on-surface-variant mt-2">{error}</p>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+  if (!data) {
+    return (
+      <Shell activePath="dashboard">
+        <div className="flex items-center justify-center h-full text-outline font-body-md">Loading dashboard…</div>
+      </Shell>
+    );
+  }
 
   let all_budget_lines: BudgetLineRow[] = [];
   if (data.budget_lines) {
