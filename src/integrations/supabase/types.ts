@@ -3360,13 +3360,594 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      approval_policies: {
+        Row: {
+          delegated_approvers: Json
+          dual_sign: boolean
+          escalation_hours: number
+          organization_id: string
+          tiers: Json
+          updated_at: string
+        }
+        Insert: {
+          delegated_approvers?: Json
+          dual_sign?: boolean
+          escalation_hours?: number
+          organization_id: string
+          tiers?: Json
+          updated_at?: string
+        }
+        Update: {
+          delegated_approvers?: Json
+          dual_sign?: boolean
+          escalation_hours?: number
+          organization_id?: string
+          tiers?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_policies_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_events: {
+        Row: {
+          action: string
+          actor: string | null
+          actor_role: string
+          event_metadata: Json
+          id: number
+          organization_id: string
+          recommendation_id: number | null
+          timestamp: string
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          actor_role: string
+          event_metadata?: Json
+          id?: number
+          organization_id: string
+          recommendation_id?: number | null
+          timestamp?: string
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          actor_role?: string
+          event_metadata?: Json
+          id?: number
+          organization_id?: string
+          recommendation_id?: number | null
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_events_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_events_organization_id_recommendation_id_fkey"
+            columns: ["organization_id", "recommendation_id"]
+            referencedRelation: "recommendations"
+            referencedColumns: ["organization_id", "id"]
+          },
+        ]
+      }
+      budget_lines: {
+        Row: {
+          allocated_amount: number
+          category: string
+          created_at: string
+          department_id: number
+          id: number
+          name: string
+          necessary_future_spend: number
+          organization_id: string
+          policy_maximum_transfer: number
+          priority_weight: number
+          safety_reserve: number
+        }
+        Insert: {
+          allocated_amount: number
+          category: string
+          created_at?: string
+          department_id: number
+          id?: number
+          name: string
+          necessary_future_spend?: number
+          organization_id: string
+          policy_maximum_transfer?: number
+          priority_weight?: number
+          safety_reserve?: number
+        }
+        Update: {
+          allocated_amount?: number
+          category?: string
+          created_at?: string
+          department_id?: number
+          id?: number
+          name?: string
+          necessary_future_spend?: number
+          organization_id?: string
+          policy_maximum_transfer?: number
+          priority_weight?: number
+          safety_reserve?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_lines_organization_id_department_id_fkey"
+            columns: ["organization_id", "department_id"]
+            referencedRelation: "departments"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "budget_lines_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      departments: {
+        Row: {
+          id: number
+          name: string
+          organization_id: string
+          priority_weight: number
+        }
+        Insert: {
+          id?: number
+          name: string
+          organization_id: string
+          priority_weight?: number
+        }
+        Update: {
+          id?: number
+          name?: string
+          organization_id?: string
+          priority_weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "departments_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      erp_mappings: {
+        Row: {
+          budget_line_id: number
+          created_at: string
+          external_gl_code: string
+          external_system: string
+          id: number
+          metadata: Json
+          organization_id: string
+        }
+        Insert: {
+          budget_line_id: number
+          created_at?: string
+          external_gl_code: string
+          external_system: string
+          id?: number
+          metadata?: Json
+          organization_id: string
+        }
+        Update: {
+          budget_line_id?: number
+          created_at?: string
+          external_gl_code?: string
+          external_system?: string
+          id?: number
+          metadata?: Json
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erp_mappings_organization_id_budget_line_id_fkey"
+            columns: ["organization_id", "budget_line_id"]
+            referencedRelation: "budget_lines"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "erp_mappings_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiscal_calendar: {
+        Row: {
+          fiscal_year_start_month: number
+          organization_id: string
+          period_labels: Json
+          period_type: string
+        }
+        Insert: {
+          fiscal_year_start_month?: number
+          organization_id: string
+          period_labels?: Json
+          period_type?: string
+        }
+        Update: {
+          fiscal_year_start_month?: number
+          organization_id?: string
+          period_labels?: Json
+          period_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_calendar_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_configs: {
+        Row: {
+          completed_steps: Json
+          metadata: Json
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          completed_steps?: Json
+          metadata?: Json
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          completed_steps?: Json
+          metadata?: Json
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_configs_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_api_keys: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          key_hash: string
+          name: string
+          organization_id: string
+          revoked_at: string | null
+          scopes: Json
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          key_hash: string
+          name: string
+          organization_id: string
+          revoked_at?: string | null
+          scopes?: Json
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          key_hash?: string
+          name?: string
+          organization_id?: string
+          revoked_at?: string | null
+          scopes?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_api_keys_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_invitations: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string | null
+          organization_id: string
+          role: string
+          status: string
+          token_hash: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          invited_by?: string | null
+          organization_id: string
+          role?: string
+          status?: string
+          token_hash: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          organization_id?: string
+          role?: string
+          status?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_invitations_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_members: {
+        Row: {
+          created_at: string
+          organization_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          organization_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          organization_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          currency: string
+          fiscal_year: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          fiscal_year: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          fiscal_year?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      performance_scores: {
+        Row: {
+          budget_line_id: number
+          id: number
+          metric_type: string
+          organization_id: string
+          period: string
+          score: number
+        }
+        Insert: {
+          budget_line_id: number
+          id?: number
+          metric_type: string
+          organization_id: string
+          period: string
+          score: number
+        }
+        Update: {
+          budget_line_id?: number
+          id?: number
+          metric_type?: string
+          organization_id?: string
+          period?: string
+          score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_scores_organization_id_budget_line_id_fkey"
+            columns: ["organization_id", "budget_line_id"]
+            referencedRelation: "budget_lines"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "performance_scores_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recommendations: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          confidence: number
+          created_at: string
+          id: number
+          organization_id: string
+          rationale_json: Json
+          source_line_id: number
+          status: string
+          target_line_id: number
+        }
+        Insert: {
+          amount: number
+          approved_at?: string | null
+          confidence: number
+          created_at?: string
+          id?: number
+          organization_id: string
+          rationale_json?: Json
+          source_line_id: number
+          status?: string
+          target_line_id: number
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          confidence?: number
+          created_at?: string
+          id?: number
+          organization_id?: string
+          rationale_json?: Json
+          source_line_id?: number
+          status?: string
+          target_line_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recommendations_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recommendations_organization_id_source_line_id_fkey"
+            columns: ["organization_id", "source_line_id"]
+            referencedRelation: "budget_lines"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "recommendations_organization_id_target_line_id_fkey"
+            columns: ["organization_id", "target_line_id"]
+            referencedRelation: "budget_lines"
+            referencedColumns: ["organization_id", "id"]
+          },
+        ]
+      }
+      scenarios: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          filters: Json
+          id: number
+          name: string
+          organization_id: string
+          shared: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          filters?: Json
+          id?: number
+          name: string
+          organization_id: string
+          shared?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          filters?: Json
+          id?: number
+          name?: string
+          organization_id?: string
+          shared?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scenarios_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spend_entries: {
+        Row: {
+          amount_spent: number
+          budget_line_id: number
+          id: number
+          organization_id: string
+          period: string
+        }
+        Insert: {
+          amount_spent: number
+          budget_line_id: number
+          id?: number
+          organization_id: string
+          period: string
+        }
+        Update: {
+          amount_spent?: number
+          budget_line_id?: number
+          id?: number
+          organization_id?: string
+          period?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spend_entries_organization_id_budget_line_id_fkey"
+            columns: ["organization_id", "budget_line_id"]
+            referencedRelation: "budget_lines"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "spend_entries_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_org_admin: {
+        Args: { target_org: string }
+        Returns: boolean
+      }
+      is_org_member: {
+        Args: { target_org: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

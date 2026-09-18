@@ -1,1 +1,7 @@
 project_id = "spb-t4n36368isizplpp"
+
+[functions.api]
+verify_jwt = false
+
+[functions.seed]
+verify_jwt = false

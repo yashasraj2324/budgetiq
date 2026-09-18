@@ -34,9 +34,12 @@ pnpm install
 pnpm dev
 ```
 
-The Vite dev server runs at `http://localhost:3000` and proxies `/api` to the
-backend at `http://localhost:8000`. No separate frontend env is needed for a
-local run; VITE_* values are read from the root `.env` (see `.env.example`).
+The Vite dev server runs at `http://localhost:3000`. By default the app talks to
+the **Enter Cloud backend** (public API gateway + database), which is what the
+platform preview uses. To run against the local Python backend instead, set
+`VITE_API_URL=/api` in `.env` (the Vite server proxies `/api` to
+`http://localhost:8000`). VITE_* values are read from the root `.env`
+(see `.env.example`).
 
 ## Authentication and tenant safety
 

@@ -1,8 +1,11 @@
 /**
  * Browser and server-side API base URL.
  */
+// Default: the Enter Cloud API gateway (public). Local dev overrides with
+// VITE_API_URL=/api in .env, which the Vite dev server proxies to the Python backend.
 export const API = (
-  import.meta.env.VITE_API_URL ?? "/api"
+  import.meta.env.VITE_API_URL ??
+  "https://spb-t4n36368isizplpp.supabase.opentrust.net/functions/v1/api"
 ).replace(/\/+$/, "");
 
 const authMode = (import.meta.env.VITE_AUTH_MODE ?? "dev").toLowerCase();
