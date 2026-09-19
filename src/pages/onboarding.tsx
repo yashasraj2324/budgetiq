@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API, apiFetch } from "@/lib/api";
+import { trackEvent } from '@enter-pro/analytics-sdk';
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ export default function OnboardingPage() {
       if (!response.ok) {
         throw new Error("Workspace setup could not be saved.");
       }
+      trackEvent('onboarding_step_completed', { eventType: 'conversion', properties: { step: 'workspace' } });
       navigate("/onboarding/data");
     } catch (error) {
       setLoading(false);

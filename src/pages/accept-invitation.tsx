@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { API, apiError, apiFetch } from "@/lib/api";
+import { trackEvent } from '@enter-pro/analytics-sdk';
 
 export default function AcceptInvitationPage() {
   const [searchParams] = useSearchParams();
@@ -60,6 +61,7 @@ export default function AcceptInvitationPage() {
         setError(await apiError(response, "Unable to accept the invitation"));
         return;
       }
+      trackEvent('invitation_accepted', { eventType: 'conversion' });
       setInfo("Invitation accepted. Opening your workspace…");
       window.setTimeout(() => navigate("/dashboard"), 600);
     } catch (reason) {

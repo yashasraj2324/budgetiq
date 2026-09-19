@@ -4,6 +4,7 @@ import { Shell } from "@/components/Shell";
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { API, apiError, apiFetch } from "@/lib/api";
+import { trackEvent } from '@enter-pro/analytics-sdk';
 
 interface WorkspaceConfig {
   org_name?: string;
@@ -221,6 +222,7 @@ export default function SettingsPage() {
 
     const invitation = await response.json();
     setInviteEmail("");
+    trackEvent('invitation_created', { eventType: 'custom' });
     if (invitation.token) {
       const link = invitationLink(invitation.token);
       setInviteLinks((previous) => ({ ...previous, [invitation.id]: link }));
@@ -304,6 +306,7 @@ export default function SettingsPage() {
     setNewKeyScopes(["budgets:read"]);
     setNewKeyExpiryDays(30);
     setMessage("API key created.");
+    trackEvent('api_key_created', { eventType: 'custom' });
     await reload();
   }
 

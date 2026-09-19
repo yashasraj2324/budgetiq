@@ -3,6 +3,7 @@ import { Shell } from "@/components/Shell";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { API, apiFetch } from "@/lib/api";
+import { trackEvent } from '@enter-pro/analytics-sdk';
 
 const formatINR = (val: number) =>
   "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
@@ -37,6 +38,7 @@ export default function RecommendationDetailPage() {
         body: JSON.stringify({ actor: "VP Finance" }),
       });
       if (res.ok) {
+        trackEvent(action === "approve" ? 'recommendation_approved' : 'recommendation_rejected', { eventType: 'conversion' });
         navigate("/approvals");
       } else {
         const body = await res.json();
@@ -62,6 +64,7 @@ export default function RecommendationDetailPage() {
         body: JSON.stringify({ amount, actor: "VP Finance" }),
       });
       if (res.ok) {
+        trackEvent('recommendation_modified', { eventType: 'conversion', properties: { amount } });
         navigate("/approvals");
       } else {
         const body = await res.json();

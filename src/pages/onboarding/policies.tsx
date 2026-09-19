@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API, apiError, apiFetch } from "@/lib/api";
+import { trackEvent } from '@enter-pro/analytics-sdk';
 
 type Line = { id: number; name: string; safety_reserve: number; necessary_future_spend: number; policy_maximum_transfer: number };
 type Field = "safety_reserve" | "necessary_future_spend" | "policy_maximum_transfer";
@@ -24,7 +25,7 @@ export default function PoliciesPage() {
       const response = await apiFetch(`${API}/onboarding/policies`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ line_policies: values }) });
       if (!response.ok) throw new Error(await apiError(response));
       setMessage(reset ? "Policies reset to zero." : "Policies saved.");
-      if (!reset) navigate("/dashboard");
+      if (!reset) { trackEvent('onboarding_step_completed', { eventType: 'conversion', properties: { step: 'policies' } }); trackEvent('onboarding_completed', { eventType: 'conversion' }); navigate("/dashboard"); }
     } catch (error) { setMessage(error instanceof Error ? error.message : "Save failed"); }
     finally { setSaving(false); }
   }

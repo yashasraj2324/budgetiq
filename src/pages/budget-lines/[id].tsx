@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Shell } from "@/components/Shell";
 import { API, apiFetch, apiError } from "@/lib/api";
+import { trackEvent } from '@enter-pro/analytics-sdk';
 
 interface Detail {
   id: number;
@@ -62,6 +63,7 @@ export default function BudgetLineDetailPage() {
       if (!response.ok) throw new Error(await apiError(response, "Unable to record spend"));
       setSpendPeriod("");
       setSpendAmount("");
+      trackEvent('spend_entry_added', { eventType: 'custom', properties: { amount } });
       load();
     } catch (reason) {
       setSpendError(reason instanceof Error ? reason.message : "Unable to record spend");

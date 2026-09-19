@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { bootstrapEnterAnalytics } from '@enter-pro/analytics-sdk';
 import LoginPage from "./pages/index";
 import SignupPage from "./pages/signup";
 import ResetPasswordPage from "./pages/reset-password";
@@ -20,6 +21,9 @@ import GovernancePage from "./pages/governance";
 import IntegrationsPage from "./pages/integrations";
 import BillingPage from "./pages/billing";
 import BudgetLineDetailPage from "./pages/budget-lines/[id]";
+
+// Initialize the analytics runtime once at app entry (auto page_view/session).
+bootstrapEnterAnalytics();
 
 export default function App() {
   return (

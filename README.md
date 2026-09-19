@@ -15,40 +15,41 @@ never delegated to the LLM provider.
 
 ## Local development
 
-### Backend
+### Frontend (the application runtime)
 
-1. Install Python 3.11+ and MongoDB.
-2. Install dependencies: `python -m pip install -e ".[dev]"`.
-3. Copy `.env.example` to `.env` and set dev auth and Mongo values.
-4. Start the API: `python main.py`.
-
-The API runs at `http://localhost:8000`.
-
-- Liveness: `GET /api/health`
-- Readiness: `GET /api/health/ready`
-
-### Frontend
+The application runs on **Vite + React** and talks to the **Enter Cloud backend**
+(public API gateway + PostgreSQL database), which is what the platform preview
+and production use. There is no local backend to start.
 
 ```powershell
 pnpm install
 pnpm dev
 ```
 
-The Vite dev server runs at `http://localhost:3000`. By default the app talks to
-the **Enter Cloud backend** (public API gateway + database), which is what the
-platform preview uses. To run against the local Python backend instead, set
-`VITE_API_URL=/api` in `.env` (the Vite server proxies `/api` to
-`http://localhost:8000`). VITE_* values are read from the root `.env`
-(see `.env.example`).
+The Vite dev server runs at `http://localhost:3000`.
+
+> Optional: to run against the legacy Python backend instead, set
+> `VITE_API_URL=/api` in `.env` (the Vite server proxies `/api` to
+> `http://localhost:8000`). This path exists only to exercise the archived
+> backend and is not part of the supported runtime. VITE_* values are read from
+> the root `.env` (see `.env.example`).
+
+### Legacy Python/MongoDB backend (ARCHIVED)
+
+`backend/` contains the original hackathon-era FastAPI + MongoDB backend. It is
+**archived**: it is no longer the runtime, it is not deployed, and it is not
+kept in parity with the active gateway. The active API is the Enter Cloud
+backend function at `supabase/functions/api/`. Do not treat `backend/` as a
+living codebase — changes to product behavior belong in the gateway and the
+frontend only.
 
 ## Authentication and tenant safety
 
-- Development auth is only allowed in development mode and requires explicit
-  `BUDGETIQ_DEV_AUTH_TOKEN` and `BUDGETIQ_DEV_ORGANIZATION_ID` values.
-- Production must use JWT mode with configured secrets and claims.
-- JWT validation enforces expiry and optional issuer/audience checks.
-- Active organization membership is required for JWT requests.
-- Every Mongo read/write goes through the tenant-scoped database facade.
+- Authentication uses Enter Cloud auth (email/password) with JWT validation.
+- Every read/write goes through the org-scoped API gateway, which derives
+  membership from the database and enforces role checks server-side.
+- Row Level Security is enabled on every business table; authorization lives in
+  RLS policies and the gateway, never in the client.
 
 ## Validation
 

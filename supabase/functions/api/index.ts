@@ -640,6 +640,24 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     });
   }
 
+  // ---- CSV import template -------------------------------------------------
+  if (first === "budget-lines" && seg.join("/") === "budget-lines/import/template" && method === "GET") {
+    const { data: depts } = await supabase.from("departments").select("id").eq("organization_id", org_id).order("id", { ascending: true }).limit(1);
+    const exampleId = depts?.[0]?.id ?? 1;
+    const template = [
+      "department_id,name,allocated_amount,priority_weight,category,necessary_future_spend,safety_reserve,policy_maximum_transfer",
+      `${exampleId},Example Budget Line,1000000,50,General,200000,50000,300000`,
+    ].join("\n");
+    return new Response(template, {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/csv",
+        "Content-Disposition": 'attachment; filename="budgetiq_budget_lines_template.csv"',
+      },
+    });
+  }
+
   if (first === "budget-lines" && seg.length === 2 && method === "POST" && seg[1] === "import") {
     if (!isAdmin) throw new HttpError(403, "Organization administrator role required");
     const form = await req.formData();

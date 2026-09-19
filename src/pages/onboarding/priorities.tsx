@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API, apiError, apiFetch } from "@/lib/api";
+import { trackEvent } from '@enter-pro/analytics-sdk';
 
 type Line = { id: number; name: string; priority_weight: number; category: string };
 
@@ -31,7 +32,7 @@ export default function PrioritiesPage() {
       });
       if (!response.ok) throw new Error(await apiError(response));
       setMessage("Priorities saved.");
-      if (continueNext) navigate("/onboarding/policies");
+      if (continueNext) { trackEvent('onboarding_step_completed', { eventType: 'conversion', properties: { step: 'priorities' } }); navigate("/onboarding/policies"); }
     } catch (error) { setMessage(error instanceof Error ? error.message : "Save failed"); }
     finally { setSaving(false); }
   }

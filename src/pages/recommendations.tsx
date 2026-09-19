@@ -3,6 +3,7 @@ import { Shell } from "@/components/Shell";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { API, apiFetch } from "@/lib/api";
+import { trackEvent } from '@enter-pro/analytics-sdk';
 
 const formatINR = (val: number) =>
   "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
@@ -76,6 +77,7 @@ export default function RecommendationsPage() {
 
     if (res.ok) {
       const data = await res.json();
+      trackEvent('recommendation_generated', { eventType: 'conversion', properties: { amount: Number(data.amount) || 0 } });
       navigate(`/recommendations/${data.id}`);
     } else {
       const body = await res.json().catch(() => ({ detail: "Unknown error" }));

@@ -30,7 +30,9 @@ This file tracks remaining launch work after the current pilot hardening pass.
 - Direct ERP/FP&A connectors and automated write-back.
 - Stripe checkout/customer portal production rollout.
 - Production email delivery and full Supabase deployment plumbing.
-- Postgres adapter cutover (Mongo remains active runtime in this workspace).
+- Legacy Python/MongoDB backend: archived. The Enter Cloud gateway + PostgreSQL
+  is the single active runtime; `backend/` is reference-only and not kept in
+  parity.
 
 ## Remaining launch-risk gaps
 

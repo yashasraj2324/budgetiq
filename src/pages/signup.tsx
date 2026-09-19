@@ -1,6 +1,7 @@
 "use client";
 import { Link, useNavigate } from "react-router-dom";
 import { FormEvent, useState } from "react";
+import { trackEvent } from '@enter-pro/analytics-sdk';
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -45,6 +46,7 @@ export default function SignupPage() {
         setError(body.error_description ?? body.msg ?? "Sign-up failed.");
         return;
       }
+      trackEvent('signup_completed', { eventType: 'conversion' });
       if (body.access_token) {
         sessionStorage.setItem("budgetiq_access_token", body.access_token);
         sessionStorage.setItem("budgetiq_actor_name", email.split("@")[0]);

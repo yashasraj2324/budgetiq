@@ -2,6 +2,7 @@
 import { Link } from "react-router-dom";
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { trackEvent } from '@enter-pro/analytics-sdk';
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -30,6 +31,7 @@ export default function LoginPage() {
     const session = await response.json();
     sessionStorage.setItem("budgetiq_access_token", session.access_token);
     if (email) sessionStorage.setItem("budgetiq_actor_name", email.split("@")[0]);
+    trackEvent('login_completed', { eventType: 'conversion' });
     navigate("/dashboard");
   };
 
