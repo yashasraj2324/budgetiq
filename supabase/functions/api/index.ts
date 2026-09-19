@@ -805,9 +805,13 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     const { data: line } = await supabase.from("budget_lines").select("id").eq("organization_id", org_id).eq("id", Number(seg[1])).maybeSingle();
     if (!line) throw new HttpError(404, "Budget line not found");
     const { data: entries } = await supabase.from("spend_entries").select("period, amount_spent").eq("organization_id", org_id).eq("budget_line_id", Number(seg[1])).order("period", { ascending: true });
-    return json((entries ?? []).map((e) => {
+    // Use the real velocity detector, never a hardcoded amount threshold.
+    const values = (entries ?? []).map((e) => num(e.amount_spent));
+    const anomaly = detectVelocityAnomaly(values);
+    const anomalyWindowStart = anomaly.detected ? Math.max(0, values.length - 2) : values.length;
+    return json((entries ?? []).map((e, idx) => {
       const parts = String(e.period).split("-");
-      return { name: parts.length > 1 ? parts[1] : e.period, spend: num(e.amount_spent), anomaly: num(e.amount_spent) > 800000, projected: false };
+      return { name: parts.length > 1 ? parts[1] : e.period, spend: num(e.amount_spent), anomaly: idx >= anomalyWindowStart, projected: false };
     }));
   }
 

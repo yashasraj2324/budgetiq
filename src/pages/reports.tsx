@@ -2,9 +2,7 @@
 import { Shell } from "@/components/Shell";
 import { useState, useEffect } from "react";
 import { API, apiFetch } from "@/lib/api";
-
-const formatINR = (val: number) =>
-  "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+import { decisionId, formatMoney, useOrgCurrency } from "@/lib/format";
 
 interface BudgetLine {
   id: number;
@@ -52,6 +50,8 @@ const actionColor: Record<string, string> = {
 };
 
 export default function ReportsPage() {
+  const { currency } = useOrgCurrency();
+  const formatINR = (val: number) => formatMoney(val, currency);
   const [lines, setLines] = useState<BudgetLine[]>([]);
   const [audit, setAudit] = useState<AuditEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -213,7 +213,7 @@ export default function ReportsPage() {
                     const amount: number | string = meta.amount ?? meta.modified_amount ?? "—";
                     return (
                       <tr key={e.id} className="hover:bg-surface-container transition-colors duration-100">
-                        <td className="py-3 px-space-lg font-code-sm text-outline">DEC-2025-{e.recommendation_id}</td>
+                        <td className="py-3 px-space-lg font-code-sm text-outline">{decisionId(e.timestamp, e.recommendation_id)}</td>
                         <td className="py-3 px-space-lg">
                           <span className={`px-2 py-0.5 rounded font-code-sm text-code-sm capitalize font-semibold ${actionColor[e.action] ?? ""}`}>
                             {e.action}

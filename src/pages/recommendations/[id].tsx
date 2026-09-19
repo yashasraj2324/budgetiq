@@ -4,14 +4,23 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { API, apiFetch } from "@/lib/api";
 import { trackEvent } from '@enter-pro/analytics-sdk';
+import { decisionId, currencySymbol, formatMoney, useOrgCurrency } from "@/lib/format";
 
-const formatINR = (val: number) =>
-  "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
-interface Recommendation { id: number; amount: number; status: string; confidence: number; rationale_json: { recommendation?: string; reasoning_steps?: { step: number; label: string; detail: string }[]; rejection_consequence?: string }; }
+interface Recommendation {
+  id: number;
+  amount: number;
+  status: string;
+  confidence: number;
+  created_at?: string | null;
+  escalation?: { overdue?: boolean; hours_overdue?: number; escalate_to?: string } | null;
+  rationale_json: { recommendation?: string; reasoning_steps?: { step: number; label: string; detail: string }[]; rejection_consequence?: string };
+}
 
 export default function RecommendationDetailPage() {
   const params = useParams();
   const navigate = useNavigate();
+  const { currency } = useOrgCurrency();
+  const formatINR = (val: number) => formatMoney(val, currency);
   const [rec, setRec] = useState<Recommendation | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -95,7 +104,7 @@ export default function RecommendationDetailPage() {
         <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-outline-variant">
           <div className="flex justify-between items-start mb-space-md">
             <div>
-              <h1 className="font-headline-lg text-headline-lg text-on-surface">Decision DEC-2025-{rec.id}</h1>
+              <h1 className="font-headline-lg text-headline-lg text-on-surface">Decision {decisionId(rec.created_at, rec.id)}</h1>
               <p className="font-body-md text-on-surface-variant mt-1">
                 Status: <span className="font-semibold capitalize">{rec.status}</span>
               </p>
@@ -157,6 +166,17 @@ export default function RecommendationDetailPage() {
             </div>
           )}
 
+          {/* Escalation banner — overdue approvals are surfaced, not hidden */}
+          {rec.escalation?.overdue && (
+            <div className="bg-secondary-fixed text-secondary rounded-lg px-space-md py-space-sm mb-space-md font-body-sm border border-secondary/30 flex items-center gap-space-xs">
+              <span className="material-symbols-outlined text-[16px]">schedule</span>
+              <span>
+                Overdue by {rec.escalation.hours_overdue?.toFixed(1)}h — escalated to{" "}
+                <span className="font-semibold">{rec.escalation.escalate_to || "finance approver"}</span>.
+              </span>
+            </div>
+          )}
+
           {/* Action buttons — Approve / Modify / Reject (pending only) */}
           {rec.status === "pending" && (
             <div className="flex flex-col gap-space-sm">
@@ -197,7 +217,7 @@ export default function RecommendationDetailPage() {
                     AI suggested {formatINR(rec.amount)}. Enter your custom amount — guardrails apply.
                   </p>
                   <div className="flex items-center gap-space-sm">
-                    <span className="font-body-md text-on-surface font-semibold">₹</span>
+                    <span className="font-body-md text-on-surface font-semibold">{currencySymbol(currency)}</span>
                     <input
                       id="modify-amount-input"
                       type="number"

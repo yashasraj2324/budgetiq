@@ -3,9 +3,7 @@ import { Shell } from "@/components/Shell";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { API, apiFetch } from "@/lib/api";
-
-const formatINR = (val: number) =>
-  "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+import { formatMoney, useOrgCurrency } from "@/lib/format";
 
 interface AnomalySignal {
   budget_line_id: number;
@@ -36,6 +34,8 @@ function SeverityBadge({ multiplier }: { multiplier: number }) {
 }
 
 export default function SignalsPage() {
+  const { currency } = useOrgCurrency();
+  const formatINR = (val: number) => formatMoney(val, currency);
   const [signals, setSignals] = useState<AnomalySignal[]>([]);
   const [lines, setLines] = useState<BudgetLine[]>([]);
   const [loading, setLoading] = useState(true);

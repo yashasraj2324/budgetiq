@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { API, apiFetch } from "@/lib/api";
+import { formatMoney, useOrgCurrency } from "@/lib/format";
 
 interface SpendEntry {
   name: string;
@@ -19,6 +20,7 @@ interface AnomalySignal {
 interface BudgetLine { id: number; name: string; allocated_amount: number; }
 
 export function RechartsChart() {
+  const { currency } = useOrgCurrency();
   const [data, setData] = useState<SpendEntry[]>([]);
   const [title, setTitle] = useState("Forecasted Burn Velocity");
   const [narrative, setNarrative] = useState("Loading spend data…");
@@ -100,7 +102,7 @@ export function RechartsChart() {
                 cursor={{ fill: "transparent" }}
                 contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)" }}
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                formatter={((value: any) => ["₹" + Number(value).toLocaleString("en-IN"), "Spend"]) as any}
+                formatter={((value: any) => [formatMoney(Number(value), currency), "Spend"]) as any}
               />
               <Bar dataKey="spend" radius={[4, 4, 0, 0]}>
                 {data.map((entry, index) => (

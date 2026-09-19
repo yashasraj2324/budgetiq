@@ -4,9 +4,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { API, apiFetch } from "@/lib/api";
 import { trackEvent } from '@enter-pro/analytics-sdk';
-
-const formatINR = (val: number) =>
-  "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+import { decisionId, formatMoney, useOrgCurrency } from "@/lib/format";
 
 interface BudgetLine {
   id: number;
@@ -18,7 +16,7 @@ interface BudgetLine {
   necessary_future_spend: number;
   safety_reserve: number;
 }
-interface Recommendation { id: number; source_line_id: number; target_line_id: number; amount: number; status: string; confidence: number; rationale_json?: Record<string, unknown>; }
+interface Recommendation { id: number; source_line_id: number; target_line_id: number; amount: number; status: string; confidence: number; created_at?: string | null; rationale_json?: Record<string, unknown>; }
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -35,6 +33,8 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function RecommendationsPage() {
+  const { currency } = useOrgCurrency();
+  const formatINR = (val: number) => formatMoney(val, currency);
   const [recs, setRecs] = useState<Recommendation[]>([]);
   const [lines, setLines] = useState<BudgetLine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,7 +128,7 @@ export default function RecommendationsPage() {
               )}
               {recs.map(rec => (
                 <tr key={rec.id} className="hover:bg-surface-container transition-colors duration-100">
-                  <td className="py-3 px-space-lg font-code-sm text-outline">DEC-2025-{rec.id}</td>
+                  <td className="py-3 px-space-lg font-code-sm text-outline">{decisionId(rec.created_at, rec.id)}</td>
                   <td className="py-3 px-space-lg font-body-md text-on-surface">
                     <span className="text-secondary font-medium">{lineName(rec.source_line_id)}</span>
                     <span className="mx-2 text-outline">→</span>

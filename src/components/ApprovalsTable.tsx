@@ -2,9 +2,7 @@
 import { useState, useEffect } from "react";
 import { API, apiFetch } from "@/lib/api";
 import { trackEvent } from '@enter-pro/analytics-sdk';
-
-const formatINR = (val: number) =>
-  "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+import { decisionId, currencySymbol, formatMoney, useOrgCurrency } from "@/lib/format";
 
 interface BudgetLine { id: number; name: string; }
 interface ReasoningStep { step: number; label: string; detail: string; }
@@ -15,6 +13,8 @@ interface Recommendation {
   amount: number;
   confidence: number;
   status: string;
+  created_at?: string | null;
+  escalation?: { overdue?: boolean; hours_overdue?: number; escalate_to?: string } | null;
   rationale_json?: { reasoning_steps?: ReasoningStep[]; rejection_consequence?: string };
 }
 
@@ -26,6 +26,8 @@ const statusStyle: Record<string, string> = {
 };
 
 export function ApprovalsTable({ initialData = [] }: { initialData?: Recommendation[] }) {
+  const { currency } = useOrgCurrency();
+  const formatINR = (val: number) => formatMoney(val, currency);
   const [data, setData] = useState<Recommendation[]>(initialData);
   const [lines, setLines] = useState<BudgetLine[]>([]);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
@@ -134,7 +136,7 @@ export function ApprovalsTable({ initialData = [] }: { initialData?: Recommendat
               return (
                 <tr key={rec.id} className="hover:bg-surface transition-colors duration-150 align-top">
                   <td className="py-space-sm px-space-lg">
-                    <div className="font-numeric-table text-numeric-table font-semibold text-on-surface">DEC-2025-{String(rec.id).padStart(3, "0")}</div>
+                    <div className="font-numeric-table text-numeric-table font-semibold text-on-surface">{decisionId(rec.created_at, rec.id)}</div>
                     <div className="font-code-sm text-code-sm text-outline mt-0.5">Automated</div>
                   </td>
 
@@ -189,7 +191,7 @@ export function ApprovalsTable({ initialData = [] }: { initialData?: Recommendat
                         <div className="font-label-md font-semibold text-on-surface">Modify Transfer Amount</div>
                         <div className="font-body-sm text-on-surface-variant">AI suggested {formatINR(rec.amount)}. Guardrails enforced.</div>
                         <div className="flex items-center gap-space-xs">
-                          <span className="font-body-md text-on-surface font-semibold">₹</span>
+                          <span className="font-body-md text-on-surface font-semibold">{currencySymbol(currency)}</span>
                           <input
                             type="number"
                             min="1"
@@ -229,9 +231,17 @@ export function ApprovalsTable({ initialData = [] }: { initialData?: Recommendat
                   </td>
 
                   <td className="py-space-sm px-space-md">
-                    <span className={`inline-flex items-center px-space-sm py-0.5 rounded font-code-sm text-code-sm font-semibold ${statusStyle[rec.status] ?? ""}`}>
-                      {rec.status.charAt(0).toUpperCase() + rec.status.slice(1)}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`inline-flex items-center px-space-sm py-0.5 rounded font-code-sm text-code-sm font-semibold ${statusStyle[rec.status] ?? ""}`}>
+                        {rec.status.charAt(0).toUpperCase() + rec.status.slice(1)}
+                      </span>
+                      {rec.escalation?.overdue && (
+                        <span className="inline-flex items-center gap-1 px-space-sm py-0.5 rounded font-code-sm text-code-sm font-semibold bg-secondary-fixed text-secondary" title={`Overdue ${rec.escalation.hours_overdue?.toFixed(1)}h`}>
+                          <span className="material-symbols-outlined text-[13px]">schedule</span>
+                          Escalated · {rec.escalation.escalate_to || "approver"}
+                        </span>
+                      )}
+                    </div>
                   </td>
 
                   <td className="py-space-sm px-space-lg text-right">

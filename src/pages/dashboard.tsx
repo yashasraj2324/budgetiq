@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { RechartsChart } from "@/components/RechartsChart";
 import { Shell } from "@/components/Shell";
 import { API, apiError, apiFetch } from "@/lib/api";
+import { formatCompact, formatMoney } from "@/lib/format";
 
 interface BudgetLineRow {
   id: number;
@@ -59,12 +60,14 @@ function currentPeriodLabel(calendar: FiscalCalendar): string {
 
 export default function DashboardPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [anomalies, setAnomalies] = useState<{ budget_line_id: number }[]>([]);
   const [syncedAt, setSyncedAt] = useState("—");
   const [error, setError] = useState("");
   const [config, setConfig] = useState<OrgConfig>({});
   const [calendar, setCalendar] = useState<FiscalCalendar>({});
+  const [searchInput, setSearchInput] = useState(searchParams.get("search") ?? "");
 
   useEffect(() => {
     let cancelled = false;
@@ -121,12 +124,19 @@ export default function DashboardPage() {
     return () => { cancelled = true; };
   }, [queryString]);
 
-  const formatCurrency = (val: number) => "₹" + (val / 100000).toFixed(1) + "L";
-  const formatINR = (val: number) => "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  const formatCurrency = (val: number) => formatCompact(val, currency);
+  const formatINR = (val: number) => formatMoney(val, currency);
   const orgName = config.org_name?.trim() || "Executive Portfolio Ledger";
   const fiscalYear = config.fiscal_year?.trim() || "FY25";
   const currency = config.currency?.trim() || "INR";
   const periodLabel = currentPeriodLabel(calendar);
+
+  const applySearch = () => {
+    const q = new URLSearchParams(searchParams.toString());
+    if (searchInput.trim()) q.set("search", searchInput.trim());
+    else q.delete("search");
+    navigate(`/dashboard${q.toString() ? `?${q.toString()}` : ""}`);
+  };
 
   if (error) {
     return (
@@ -190,6 +200,18 @@ export default function DashboardPage() {
               <span className="material-symbols-outlined text-[16px] text-outline">tune</span>
               <span>Filter Scenarios</span>
             </Link>
+            <form
+              onSubmit={(event) => { event.preventDefault(); applySearch(); }}
+              className="flex items-center gap-space-xs px-space-md py-1 bg-surface-container-lowest text-outline font-body-sm text-body-sm rounded shadow-sm border border-outline-variant"
+            >
+              <span className="material-symbols-outlined text-[16px] text-outline">search</span>
+              <input
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="Search lines…"
+                className="bg-transparent outline-none text-on-surface w-36"
+              />
+            </form>
             <a href={`${API}/dashboard/export.csv${queryString ? `?${queryString}` : ""}`} className="flex items-center gap-space-xs px-space-md py-1 bg-surface-container-low text-outline font-body-sm text-body-sm font-medium rounded shadow-sm transition-colors duration-150">
               <span className="material-symbols-outlined text-[16px]">file_download</span>
               <span>Export CSV</span>

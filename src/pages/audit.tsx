@@ -2,9 +2,7 @@
 import { Shell } from "@/components/Shell";
 import { useState, useEffect } from "react";
 import { API, apiFetch } from "@/lib/api";
-
-const formatINR = (val: number) =>
-  "₹" + val.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+import { decisionId, formatMoney, useOrgCurrency } from "@/lib/format";
 
 interface AuditEvent {
   id: number;
@@ -42,6 +40,8 @@ function downloadCSV(rows: Record<string, unknown>[], filename: string) {
 }
 
 export default function AuditPage() {
+  const { currency } = useOrgCurrency();
+  const formatINR = (val: number) => formatMoney(val, currency);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
@@ -150,7 +150,7 @@ export default function AuditPage() {
                   return (
                     <tr key={e.id} className="hover:bg-surface transition-colors duration-100">
                       <td className="py-space-sm px-space-lg font-numeric-table text-on-surface font-semibold">EVT-{String(e.id).padStart(4, "0")}</td>
-                      <td className="py-space-sm px-space-md font-code-sm text-on-surface-variant">DEC-2025-{String(e.recommendation_id).padStart(3, "0")}</td>
+                      <td className="py-space-sm px-space-md font-code-sm text-on-surface-variant">{decisionId(e.timestamp, e.recommendation_id)}</td>
                       <td className="py-space-sm px-space-md">
                         <span className={`inline-flex items-center px-space-sm py-0.5 rounded font-code-sm font-semibold capitalize ${actionStyle[e.action] ?? "bg-surface-container text-on-surface"}`}>
                           {e.action}

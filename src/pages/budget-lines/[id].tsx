@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import { Shell } from "@/components/Shell";
 import { API, apiFetch, apiError } from "@/lib/api";
 import { trackEvent } from '@enter-pro/analytics-sdk';
+import { formatMoney, currencySymbol, useOrgCurrency } from "@/lib/format";
 
 interface Detail {
   id: number;
@@ -20,6 +21,7 @@ interface Detail {
 
 export default function BudgetLineDetailPage() {
   const params = useParams<{ id: string }>();
+  const { currency } = useOrgCurrency();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState("");
   const [spendPeriod, setSpendPeriod] = useState("");
@@ -72,7 +74,7 @@ export default function BudgetLineDetailPage() {
     }
   };
 
-  const money = (value: number) => `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+  const money = (value: number) => formatMoney(value, currency);
 
   return (
     <Shell activePath="dashboard">
@@ -115,7 +117,7 @@ export default function BudgetLineDetailPage() {
                     />
                   </label>
                   <label className="text-sm text-on-surface-variant">
-                    Amount spent (₹)
+                    Amount spent ({currencySymbol(currency)})
                     <input
                       type="number"
                       min="0"
