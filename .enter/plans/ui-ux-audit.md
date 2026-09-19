@@ -434,3 +434,140 @@ metric's meaning (neutral / positive / attention).
       intact.
 - [ ] Functional regression: login → onboarding → dashboard → signals →
       generate → approve still completes (status 200s on gateway calls).
+
+---
+
+# Part 3 — Demo "Wow" Cluster (Next-Tier UI/UX)
+
+## Context
+
+Following the quick-wins execution, this cluster targets the highest-leverage
+**visual-impact surfaces for the hackathon demo**, per stakeholder decision:
+(1) hero recommendation card, (2) premium chart, (3) login polish,
+(4) micro-interactions. All changes are token-based and reversible.
+
+## A. Hero recommendation card (`src/pages/recommendations/[id].tsx`)
+
+**Problem:** the detail page's headline is plain text ("Decision REC-…" +
+status); the amount is not visually the hero even though the recommendation IS
+the product.
+
+**Plan:**
+- Fetch `/budget-lines` (pattern already used in approvals/signals) to resolve
+  source/target line names + guardrail inputs
+  (necessary_future_spend, safety_reserve, policy_maximum_transfer, remaining).
+- Render a hero card at the top of the detail page:
+  - **Flow chips**: source chip (line name, dept) → arrow icon → target chip,
+    using `bg-surface-container rounded-lg px-3 py-1.5` containers.
+  - **Hero amount**: transfer value in `font-numeric-metric-lg` at 2× scale with
+    `formatMoney(value, currency)` from `@/lib/format` (already reused).
+  - **Guardrail sub-line**: "From source surplus ₹X · capped by policy ₹Y" —
+    computed from the fetched line data via the same surplus math used on the
+    dashboard (`remaining - necessary_future_spend - safety_reserve`).
+  - **Pills**: confidence (`font-code-sm` pill) + status pill beside the amount.
+- Keep the existing escalation banner, reasoning trace, and action buttons below.
+
+**Rationale:** finance judges read the amount and its guardrail first; the hero
+makes the deterministic-engine story visually obvious.
+
+## B. Premium chart (`src/components/RechartsChart.tsx` + dashboard donut)
+
+**Problem:** the burn-velocity bar chart is flat single-color; the dashboard has
+no utilization visualization.
+
+**Plan:**
+- Add a `<defs>` linear gradient (`spendGrad`, primary-container at 50% →
+  10%) and fill non-anomaly bars with `url(#spendGrad)`; keep the anomaly bars
+  solid secondary-fixed. Slightly larger bar radius `[6, 6, 0, 0]`.
+- Add a compact **Budget utilisation donut** on the dashboard using `recharts`
+  `PieChart` (already in the bundle): "Allocated vs Remaining" fed from the
+  existing `total_budget` / `total_remaining` payload — a donut in
+  `success`/`primary` slices with a center label showing remaining %. Place it
+  beside the burn chart in a 2-col `lg:grid-cols-2` row (empty state if no
+  budget).
+- Tooltip stays token-styled (done in Part 2).
+
+**Rationale:** gradient depth + a utilization donut read as "designed" in
+seconds; both are token-derived, no new dependencies.
+
+## C. Login polish (`src/pages/index.tsx`, `src/pages/signup.tsx`)
+
+**Problem:** the auth card sits on a flat background — a flat first impression
+for the demo.
+
+**Plan:**
+- Page wrapper: layer two token-derived radial tints over `bg-background`
+  (primary blue ~8% at top-left, success green ~6% at bottom-right) via
+  arbitrary-value background-image classes — no new assets.
+- Under the card header add a one-line value prop:
+  "Detect · Calculate · Explain · Approve — AI explains, the engine decides,
+  humans approve." in `text-on-surface-variant font-body-sm`.
+- Submit button: add `hover:shadow-md` elevation.
+
+**Rationale:** first-impression lift with pure token work; reinforces the pitch
+in words on the entry screen.
+
+## D. Micro-interactions
+
+**Problem:** interactions are functional but flat (no press feedback, no modal
+entrance, no card lift).
+
+**Plan:**
+- `src/index.css`: add `@keyframes modal-in` (opacity 0→1, translateY 8px→0,
+  scale 0.98→1, 180ms ease-out). Global reduced-motion rule (Part 1) already
+  disables it for users who request that.
+- Generate modal card (`src/pages/recommendations.tsx`): apply
+  `animate-[modal-in_0.18s_ease-out]`.
+- Dashboard metric cards: add `hover:shadow-md transition-shadow duration-150`
+  (lift shadow, no layout shift; no translate to avoid jank).
+- Key CTAs (sign-in, generate, primary save buttons): add
+  `active:scale-[0.98]` for a tactile press state.
+
+**Rationale:** motion is the cheapest "polished" signal; kept minimal and
+reduced-motion-safe per Part 1 rules.
+
+## Files to modify
+
+- `src/pages/recommendations/[id].tsx` — hero card (flow chips, hero amount,
+  guardrail sub-line, pills)
+- `src/components/RechartsChart.tsx` — gradient bars
+- `src/pages/dashboard.tsx` — utilisation donut, card hover lift, active press
+- `src/pages/index.tsx`, `src/pages/signup.tsx` — background tints + value prop
+- `src/pages/recommendations.tsx` — modal entrance animation
+- `src/index.css` — `modal-in` keyframes
+- `src/components/ApprovalsTable.tsx`, primary buttons — `active:scale-[0.98]`
+
+## Implementation checklist
+
+- [ ] `recommendations/[id].tsx`: fetch `/budget-lines`; hero card renders flow
+      chips (source → target), `formatMoney` hero amount, guardrail sub-line
+      (source surplus + policy cap from fetched line data), confidence + status
+      pills.
+- [ ] `RechartsChart.tsx`: `<defs>` linear gradient; non-anomaly bars use
+      `url(#spendGrad)`; anomaly bars stay secondary-fixed; radius `[6,6,0,0]`.
+- [ ] `dashboard.tsx`: Budget-utilisation donut (PieChart, total_budget vs
+      total_remaining, success/primary slices, center remaining % label) in a
+      `lg:grid-cols-2` row beside the burn chart; graceful empty state when
+      `total_budget` is 0.
+- [ ] `index.css`: `modal-in` keyframes; `index.tsx` + `signup.tsx`: layered
+      radial tints + one-line value prop + `hover:shadow-md` on submit.
+- [ ] Generate modal card gets `animate-[modal-in_0.18s_ease-out]`.
+- [ ] Dashboard metric cards get `hover:shadow-md transition-shadow
+      duration-150`; key CTAs get `active:scale-[0.98]`.
+- [ ] Grep: no new hardcoded hex in chart/dashboard (tokens or rgba of tokens
+      only).
+
+## Verification checklist
+
+- [ ] `pnpm build` and `pnpm lint` pass with zero errors.
+- [ ] Screenshot `desktop_1280` of login: gradient background present, value
+      prop visible, no overflow; signup matches.
+- [ ] Interior (code-verified, auth-gated): recommendation detail shows flow
+      chips + hero amount + guardrail sub-line; dashboard shows donut + gradient
+      bars + hover shadow on metric cards; generate modal animates in.
+- [ ] Reduced-motion: with OS reduce-motion on, `modal-in` is suppressed by the
+      Part 1 global rule (no visible entrance animation).
+- [ ] Donut empty state renders text (not a broken chart) when `total_budget` is
+      0.
+- [ ] Functional regression: generate → open detail → approve still returns 200
+      and the hero values match the recommendation amount and line guardrails.
