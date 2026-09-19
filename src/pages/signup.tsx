@@ -2,6 +2,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { FormEvent, useState } from "react";
 import { trackEvent } from '@enter-pro/analytics-sdk';
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -24,12 +25,8 @@ export default function SignupPage() {
       setError("Passwords do not match.");
       return;
     }
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!url || !anonKey) {
-      setError("Enter Cloud authentication is not configured.");
-      return;
-    }
+    const url = SUPABASE_URL;
+    const anonKey = SUPABASE_PUBLISHABLE_KEY;
     setSubmitting(true);
     try {
       const response = await fetch(`${url}/auth/v1/signup`, {

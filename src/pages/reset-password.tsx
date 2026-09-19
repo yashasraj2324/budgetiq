@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -21,9 +22,9 @@ export default function ResetPasswordPage() {
   // session so the user can set a new password.
   useEffect(() => {
     if (!isRecovery) return;
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!url || !anonKey || !tokenHash) {
+    const url = SUPABASE_URL;
+    const anonKey = SUPABASE_PUBLISHABLE_KEY;
+    if (!tokenHash) {
       setMessage("Enter Cloud password recovery is not configured.");
       return;
     }
@@ -51,13 +52,8 @@ export default function ResetPasswordPage() {
     event.preventDefault();
     setMessage("");
     setBusy(true);
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!url || !anonKey) {
-      setMessage("Enter Cloud password recovery is not configured.");
-      setBusy(false);
-      return;
-    }
+    const url = SUPABASE_URL;
+    const anonKey = SUPABASE_PUBLISHABLE_KEY;
     fetch(`${url}/auth/v1/recover`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: anonKey },
@@ -90,10 +86,10 @@ export default function ResetPasswordPage() {
       return;
     }
     setBusy(true);
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const url = SUPABASE_URL;
+    const anonKey = SUPABASE_PUBLISHABLE_KEY;
     const token = sessionStorage.getItem("budgetiq_access_token");
-    if (!url || !anonKey || !token) {
+    if (!token) {
       setMessage("Enter Cloud password recovery is not configured.");
       setBusy(false);
       return;

@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { API, apiError, apiFetch } from "@/lib/api";
 import { trackEvent } from '@enter-pro/analytics-sdk';
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 
 export default function AcceptInvitationPage() {
   const [searchParams] = useSearchParams();
@@ -17,12 +18,8 @@ export default function AcceptInvitationPage() {
   const [busy, setBusy] = useState(false);
 
   const signIn = async (): Promise<boolean> => {
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!url || !anonKey) {
-      setError("Enter Cloud authentication is not configured.");
-      return false;
-    }
+    const url = SUPABASE_URL;
+    const anonKey = SUPABASE_PUBLISHABLE_KEY;
     const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: anonKey },
