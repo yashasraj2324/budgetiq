@@ -168,6 +168,8 @@ function requiredScope(seg: string[], method: string): string | null {
       return isRead ? "budgets:read" : "budgets:write";
     case "budget-lines":
       return isRead ? "budgets:read" : "budgets:write";
+    case "spend":
+      return isRead ? "budgets:read" : "budgets:write";
     case "recommendations": {
       if (seg[2] && ["approve", "modify", "reject"].includes(seg[2])) return "approvals:write";
       return isRead ? "recommendations:read" : "recommendations:write";
@@ -834,6 +836,60 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     }
     await logAudit(supabase, ctx, "spend_entry_added", { budget_line_id: lineId, period, amount_spent: amountSpent });
     return json({ ok: true, budget_line_id: lineId, period, amount_spent: amountSpent }, 201);
+  }
+
+  // Bulk spend import — the monthly budget-refresh surface. Upserts on
+  // (budget_line_id, period) so re-importing a period replaces its value.
+  if (first === "spend" && seg[1] === "import" && method === "POST") {
+    if (!isAdmin) throw new HttpError(403, "Organization administrator role required");
+    const form = await req.formData();
+    const file = form.get("file");
+    if (!(file instanceof File)) throw new HttpError(422, "CSV file required");
+    const rows = parseCsv(await file.text());
+    if (!rows.length) throw new HttpError(422, "CSV file is empty");
+    const required = ["budget_line_id", "period", "amount_spent"];
+    for (const col of required) if (!(col in rows[0])) throw new HttpError(422, `CSV must include columns: ${required.join(", ")}`);
+    const { data: lines } = await supabase.from("budget_lines").select("id").eq("organization_id", org_id);
+    const lineIds = new Set((lines ?? []).map((l) => Number(l.id)));
+    const errors: { row: number; error: string }[] = [];
+    const upserts: { id: number | null; insert: { organization_id: string; budget_line_id: number; period: string; amount_spent: number } }[] = [];
+    const seen = new Set<string>();
+    for (const [idx, row] of rows.entries()) {
+      const rowNumber = idx + 2;
+      try {
+        const lineId = Number(row.budget_line_id);
+        if (!Number.isInteger(lineId) || !lineIds.has(lineId)) throw new Error(`budget_line ${row.budget_line_id} not found`);
+        const period = String(row.period ?? "").trim();
+        if (!period) throw new Error("period is required");
+        const amount = Number(row.amount_spent);
+        if (!Number.isFinite(amount) || amount < 0) throw new Error("amount_spent must be a non-negative number");
+        const key = `${lineId}|${period}`;
+        if (seen.has(key)) throw new Error("duplicate row for the same line and period");
+        seen.add(key);
+        const { data: existing } = await supabase.from("spend_entries").select("id").eq("organization_id", org_id).eq("budget_line_id", lineId).eq("period", period).maybeSingle();
+        upserts.push({
+          id: existing ? Number(existing.id) : null,
+          insert: { organization_id: org_id, budget_line_id: lineId, period, amount_spent: money(amount) },
+        });
+      } catch (e) {
+        errors.push({ row: rowNumber, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    if (errors.length) throw new HttpError(422, JSON.stringify({ errors }));
+    let created = 0;
+    let updated = 0;
+    for (const item of upserts) {
+      if (item.id !== null) {
+        await supabase.from("spend_entries").update({ amount_spent: item.insert.amount_spent }).eq("id", item.id);
+        updated += 1;
+      } else {
+        const { error } = await supabase.from("spend_entries").insert(item.insert);
+        if (error) throw new HttpError(500, `Import failed: ${error.message}`);
+        created += 1;
+      }
+    }
+    await logAudit(supabase, ctx, "spend_entry_added", { import: true, created, updated });
+    return json({ ok: true, created, updated, errors: [] });
   }
 
   if (first === "budget-lines" && seg.length === 3 && seg[2] === "forecast" && method === "GET") {

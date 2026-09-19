@@ -83,6 +83,17 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
               <span>Dashboard</span>
             </Link>
             <Link
+              to="/import"
+              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+                activePath === "import"
+                  ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
+                  : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">publish</span>
+              <span>Import Data</span>
+            </Link>
+            <Link
               to="/recommendations"
               className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
                 activePath === "recommendations"

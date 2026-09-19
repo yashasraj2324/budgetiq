@@ -9,16 +9,21 @@ export default function BillingPage() {
         <div>
           <h1 className="font-headline-lg text-on-surface">Billing</h1>
           <p className="text-sm text-on-surface-variant mt-1">
-            Billing is deferred for this milestone.
+            Free design-partner pilot — billing is a stated gate, not an indefinite deferral.
           </p>
         </div>
 
         <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-lg space-y-space-sm">
           <p className="text-on-surface">
-            Stripe checkout and subscription management are intentionally disabled in the pilot release.
+            Stripe checkout and subscription management are not enabled during the free pilot.
           </p>
           <p className="text-sm text-on-surface-variant">
-            Core workflows (onboarding, imports, dashboards, recommendations, approvals, and audit) run without billing configuration.
+            Gate: billing will be enabled before the paid pilot launch, target <strong>December 15, 2026</strong>.
+            No plan/seat pricing is charged before that date, and enabling it is tracked as an explicit launch
+            milestone rather than left silently deferred.
+          </p>
+          <p className="text-sm text-on-surface-variant">
+            Core workflows (imports, dashboards, recommendations, approvals, and audit) run without billing configuration.
           </p>
         </div>
       </div>

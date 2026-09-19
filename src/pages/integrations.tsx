@@ -30,14 +30,14 @@ export default function IntegrationsPage() {
         <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-space-lg space-y-space-md">
           <h2 className="font-headline-md text-headline-md text-on-surface">Supported now</h2>
           <ul className="list-disc list-inside text-sm text-on-surface-variant space-y-1">
-            <li>CSV import through onboarding and <code>/api/budget-lines/import</code></li>
+            <li>CSV import of budget lines and monthly spend entries from <code>/import</code></li>
             <li>Manual budget line creation and policy edits in workspace settings</li>
-            <li>Spend entry recording per budget line to drive anomalies and forecasts</li>
+            <li>Single spend-entry recording per budget line to drive anomalies and forecasts</li>
             <li>Tenant-scoped import validation with row-level error reporting</li>
           </ul>
           <div className="flex flex-wrap gap-2">
-            <Link to="/onboarding/data" className="rounded bg-primary px-4 py-2 text-sm font-semibold text-on-primary">
-              Go to CSV import
+            <Link to="/import" className="rounded bg-primary px-4 py-2 text-sm font-semibold text-on-primary">
+              Import budget data
             </Link>
             <Link to="/settings" className="rounded border border-outline-variant px-4 py-2 text-sm hover:bg-surface-container-low">
               Open manual settings

@@ -576,7 +576,9 @@ export default function SettingsPage() {
 
             <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-lg">
               <h2 className="font-headline-md text-on-surface">Billing</h2>
-              <p className="text-sm text-on-surface-variant mt-1">Billing is deferred for this milestone. Stripe setup is non-blocking and disabled by default.</p>
+              <p className="text-sm text-on-surface-variant mt-1">
+                Free design-partner pilot. Gate: billing is enabled at paid pilot launch (target December 15, 2026) — tracked as an explicit milestone, not an indefinite deferral.
+              </p>
             </div>
           </>
         )}

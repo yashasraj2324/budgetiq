@@ -1,0 +1,3 @@
+drop trigger if exists audit_events_immutable on public.audit_events;
+delete from public.organizations where id = 'ae87b97c-f268-4536-a894-8aeff4a316c6';
+create trigger audit_events_immutable before update or delete on public.audit_events for each row execute function public.prevent_audit_mutation();

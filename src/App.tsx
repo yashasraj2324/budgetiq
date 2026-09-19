@@ -9,6 +9,7 @@ import OnboardingDataPage from "./pages/onboarding/data";
 import OnboardingPoliciesPage from "./pages/onboarding/policies";
 import OnboardingPrioritiesPage from "./pages/onboarding/priorities";
 import DashboardPage from "./pages/dashboard";
+import ImportPage from "./pages/import";
 import RecommendationsPage from "./pages/recommendations";
 import RecommendationDetailPage from "./pages/recommendations/[id]";
 import ApprovalsPage from "./pages/approvals";
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/onboarding/policies" element={<OnboardingPoliciesPage />} />
         <Route path="/onboarding/priorities" element={<OnboardingPrioritiesPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/import" element={<ImportPage />} />
         <Route path="/recommendations" element={<RecommendationsPage />} />
         <Route path="/recommendations/:id" element={<RecommendationDetailPage />} />
         <Route path="/approvals" element={<ApprovalsPage />} />
