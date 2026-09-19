@@ -124,7 +124,7 @@ export default function RecommendationsPage() {
                 <tr><td colSpan={5} className="py-8 text-center text-outline">Loading…</td></tr>
               )}
               {!loading && recs.length === 0 && (
-                <tr><td colSpan={5} className="py-8 text-center text-outline">No recommendations yet. Generate one to get started.</td></tr>
+                <tr><td colSpan={5} className="py-8 text-center text-outline">No recommendations yet. <button type="button" onClick={() => { setShowModal(true); setGenError(""); }} className="text-primary hover:underline font-medium">Generate one</button> to get started.</td></tr>
               )}
               {recs.map(rec => (
                 <tr key={rec.id} className="hover:bg-surface-container transition-colors duration-100">
@@ -166,6 +166,7 @@ export default function RecommendationsPage() {
               </div>
               <button
                 id="btn-close-modal"
+                aria-label="Close"
                 onClick={() => { setShowModal(false); setGenError(""); }}
                 className="text-outline hover:text-on-surface transition-colors"
               >

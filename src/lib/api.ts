@@ -28,6 +28,7 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
     throw new Error("Unable to reach BudgetIQ API. Check that the backend is running.");
   }
   if (response.status === 401 && typeof window !== "undefined" && window.location.pathname !== "/") {
+    sessionStorage.setItem("budgetiq_session_expired", "1");
     window.location.assign("/");
   }
   return response;

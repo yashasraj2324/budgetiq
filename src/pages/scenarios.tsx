@@ -44,6 +44,7 @@ export default function ScenariosPage() {
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   useEffect(() => {
     void loadScenarios();
@@ -106,9 +107,9 @@ export default function ScenariosPage() {
   }
 
   async function deleteScenario(id: number) {
-    if (!confirm("Delete this scenario?")) return;
     setError("");
     setMessage("");
+    setConfirmDeleteId(null);
     const response = await apiFetch(`${API}/scenarios/${id}`, { method: "DELETE" });
     if (!response.ok) {
       setError(await apiError(response, "Failed to delete scenario"));
@@ -293,9 +294,26 @@ export default function ScenariosPage() {
                         <button onClick={() => void duplicateScenario(scenario.id)} className="text-on-surface-variant hover:text-primary transition-colors" title="Duplicate">
                           Duplicate
                         </button>
-                        <button onClick={() => void deleteScenario(scenario.id)} className="text-on-surface-variant hover:text-error transition-colors" title="Delete">
-                          Delete
-                        </button>
+                        {confirmDeleteId === scenario.id ? (
+                          <button
+                            onClick={() => void deleteScenario(scenario.id)}
+                            className="text-error font-semibold transition-colors"
+                            title="Click to confirm deletion"
+                          >
+                            Confirm?
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setConfirmDeleteId(scenario.id);
+                              window.setTimeout(() => setConfirmDeleteId((current) => (current === scenario.id ? null : current)), 3000);
+                            }}
+                            className="text-on-surface-variant hover:text-error transition-colors"
+                            title="Delete"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

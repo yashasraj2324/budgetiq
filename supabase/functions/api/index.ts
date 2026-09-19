@@ -585,10 +585,22 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     const reallocatable = visible.reduce((a, l) => a + Math.max(0, l.remaining_budget - num(l.necessary_future_spend) - num(l.safety_reserve)), 0);
 
     const medianAllocation = median((allLines ?? []).map((l) => num(l.allocated_amount)));
+    // Single-pass anomaly scan: fetch all spend once, group by line, then run
+    // the detectors in memory instead of one query per line (N+1).
+    const { data: spendRows } = await supabase
+      .from("spend_entries")
+      .select("budget_line_id, amount_spent")
+      .eq("organization_id", org_id)
+      .order("period", { ascending: true });
+    const spendByLine = new Map<number, number[]>();
+    for (const s of spendRows ?? []) {
+      const lineId = Number(s.budget_line_id);
+      if (!spendByLine.has(lineId)) spendByLine.set(lineId, []);
+      spendByLine.get(lineId)!.push(num(s.amount_spent));
+    }
     let anomalyCount = 0;
     for (const l of visible) {
-      const { data: entries } = await supabase.from("spend_entries").select("amount_spent").eq("organization_id", org_id).eq("budget_line_id", Number(l.id)).order("period", { ascending: true });
-      const velocity = detectVelocityAnomaly((entries ?? []).map((e) => num(e.amount_spent)));
+      const velocity = detectVelocityAnomaly(spendByLine.get(Number(l.id)) ?? []);
       const structural = structuralAnomalies(l, l.remaining_budget, medianAllocation);
       if (velocity.detected || structural.length) anomalyCount += 1;
     }

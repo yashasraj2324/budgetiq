@@ -73,7 +73,7 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
           <nav className="flex flex-col">
             <Link
               to="/dashboard"
-              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+              className={`flex items-center min-h-11 gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
                 activePath === "dashboard"
                   ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
                   : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
@@ -84,7 +84,7 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
             </Link>
             <Link
               to="/import"
-              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+              className={`flex items-center min-h-11 gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
                 activePath === "import"
                   ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
                   : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
@@ -95,7 +95,7 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
             </Link>
             <Link
               to="/recommendations"
-              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+              className={`flex items-center min-h-11 gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
                 activePath === "recommendations"
                   ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
                   : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
@@ -106,7 +106,7 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
             </Link>
             <Link
               to="/approvals"
-              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+              className={`flex items-center min-h-11 gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
                 activePath === "approvals"
                   ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
                   : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
@@ -117,7 +117,7 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
             </Link>
             <Link
               to="/signals"
-              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+              className={`flex items-center min-h-11 gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
                 activePath === "signals"
                   ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
                   : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
@@ -128,7 +128,7 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
             </Link>
             <Link
               to="/reports"
-              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+              className={`flex items-center min-h-11 gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
                 activePath === "reports"
                   ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
                   : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
@@ -139,7 +139,7 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
             </Link>
             <Link
               to="/audit"
-              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+              className={`flex items-center min-h-11 gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
                 activePath === "audit"
                   ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
                   : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
@@ -150,7 +150,7 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
             </Link>
             <Link
               to="/scenarios"
-              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+              className={`flex items-center min-h-11 gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
                 activePath === "scenarios"
                   ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
                   : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
@@ -159,9 +159,10 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
               <span className="material-symbols-outlined text-[18px]">bookmarks</span>
               <span>Scenarios</span>
             </Link>
+            <span className="font-label-caps text-label-caps uppercase text-outline px-space-sm py-space-xs block">Administration</span>
             <Link
               to="/settings"
-              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+              className={`flex items-center min-h-11 gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
                 activePath === "settings"
                   ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
                   : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
@@ -172,7 +173,7 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
             </Link>
             <Link
               to="/governance"
-              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+              className={`flex items-center min-h-11 gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
                 activePath === "governance"
                   ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
                   : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"
@@ -183,7 +184,7 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
             </Link>
             <Link
               to="/integrations"
-              className={`flex items-center gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
+              className={`flex items-center min-h-11 gap-space-md px-space-lg py-space-sm transition-colors duration-150 ${
                 activePath === "integrations"
                   ? "text-primary-container font-medium border-l-2 border-primary-container bg-surface-container-low"
                   : "font-body-md text-body-md text-outline hover:text-on-surface hover:bg-surface-container-low"

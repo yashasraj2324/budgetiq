@@ -126,7 +126,11 @@ export default function SignalsPage() {
 
         {/* Signal cards */}
         {loading ? (
-          <div className="py-16 text-center text-outline font-body-md">Scanning for anomalies…</div>
+          <div className="flex flex-col gap-space-md" aria-busy="true" aria-label="Loading signals">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-space-lg h-40 animate-pulse" />
+            ))}
+          </div>
         ) : signals.length === 0 ? (
           <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-xl text-center">
             <span className="material-symbols-outlined text-[48px] text-outline mb-space-md block">check_circle</span>

@@ -1,6 +1,6 @@
 "use client";
 import { Link } from "react-router-dom";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trackEvent } from '@enter-pro/analytics-sdk';
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
@@ -8,8 +8,16 @@ import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (sessionStorage.getItem("budgetiq_session_expired")) {
+      sessionStorage.removeItem("budgetiq_session_expired");
+      setNotice("Your session expired — please sign in again.");
+    }
+  }, []);
 
   const signIn = async (event: FormEvent) => {
     event.preventDefault();
@@ -109,6 +117,7 @@ export default function LoginPage() {
             <span>Sign In</span>
             <span className="material-symbols-outlined text-[18px]">login</span>
           </button>
+          {notice && <p className="text-sm text-secondary" role="status">{notice}</p>}
           {error && <p className="text-sm text-error" role="alert">{error}</p>}
         </form>
 

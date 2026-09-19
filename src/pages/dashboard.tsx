@@ -153,7 +153,14 @@ export default function DashboardPage() {
   if (!data) {
     return (
       <Shell activePath="dashboard">
-        <div className="flex items-center justify-center h-full text-outline font-body-md">Loading dashboard…</div>
+        <div className="flex flex-col w-full gap-space-xl" aria-busy="true" aria-label="Loading dashboard">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-lg">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="bg-surface-container-lowest p-space-lg rounded shadow-sm h-32 animate-pulse" />
+            ))}
+          </div>
+          <div className="bg-surface-container-lowest rounded shadow-sm h-72 animate-pulse" />
+        </div>
       </Shell>
     );
   }

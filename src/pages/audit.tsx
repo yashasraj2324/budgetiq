@@ -165,6 +165,9 @@ export default function AuditPage() {
                           <span>
                             {formatINR(prevSrc)}
                             <span className="text-outline mx-1">→</span>
+                            <span className={`inline-block mr-1 ${newSrc < prevSrc ? "text-error" : "text-primary"}`}>
+                              {newSrc < prevSrc ? "↓" : "↑"}
+                            </span>
                             <span className={newSrc < prevSrc ? "text-error" : "text-primary"}>{formatINR(newSrc)}</span>
                           </span>
                         ) : "—"}

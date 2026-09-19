@@ -355,6 +355,25 @@ export default function SettingsPage() {
           </p>
         </div>
 
+        {/* In-page section anchors so admin functions are reachable without long scrolling */}
+        <div className="flex flex-wrap gap-2">
+          {([
+            ["#profile", "Organization"],
+            ["#fiscal", "Fiscal calendar"],
+            ["#team", "Team & access"],
+            ["#api", "API keys"],
+            ["#billing", "Billing"],
+          ] as const).map(([href, label]) => (
+            <a
+              key={href}
+              href={href}
+              className="px-3 py-1.5 rounded-full border border-outline-variant bg-surface-container-lowest text-sm text-on-surface hover:bg-surface-container-low transition-colors font-medium"
+            >
+              {label}
+            </a>
+          ))}
+        </div>
+
         {error && <p role="alert" className="text-error">{error}</p>}
         {message && <p role="status" className="text-primary-container">{message}</p>}
 
@@ -369,7 +388,7 @@ export default function SettingsPage() {
           <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-lg text-outline">Loading settings...</div>
         ) : (
           <>
-            <form onSubmit={saveOrganizationConfig} className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-lg space-y-space-md">
+            <form onSubmit={saveOrganizationConfig} id="profile" className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-lg space-y-space-md scroll-mt-16">
               <h2 className="font-headline-md text-on-surface">Organization profile</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-space-md">
                 <label className="block text-sm text-on-surface">
@@ -390,7 +409,7 @@ export default function SettingsPage() {
               </div>
             </form>
 
-            <form onSubmit={saveFiscalCalendar} className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-lg space-y-space-md">
+            <form onSubmit={saveFiscalCalendar} id="fiscal" className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-lg space-y-space-md scroll-mt-16">
               <h2 className="font-headline-md text-on-surface">Fiscal calendar</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-space-md">
                 <label className="block text-sm text-on-surface">
@@ -445,7 +464,7 @@ export default function SettingsPage() {
               </div>
             </form>
 
-            <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-lg space-y-space-md">
+            <div id="team" className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-lg space-y-space-md scroll-mt-16">
               <h2 className="font-headline-md text-on-surface">Membership and invitations</h2>
               <form onSubmit={createInvitation} className="grid grid-cols-1 md:grid-cols-4 gap-space-md">
                 <label className="block text-sm text-on-surface md:col-span-2">
@@ -527,7 +546,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-lg space-y-space-md">
+            <div id="api" className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-lg space-y-space-md scroll-mt-16">
               <h2 className="font-headline-md text-on-surface">API keys</h2>
               <form onSubmit={createApiKey} className="grid grid-cols-1 md:grid-cols-4 gap-space-md">
                 <label className="block text-sm text-on-surface">
@@ -574,7 +593,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-lg">
+            <div id="billing" className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-lg scroll-mt-16">
               <h2 className="font-headline-md text-on-surface">Billing</h2>
               <p className="text-sm text-on-surface-variant mt-1">
                 Free design-partner pilot. Gate: billing is enabled at paid pilot launch (target December 15, 2026) — tracked as an explicit milestone, not an indefinite deferral.
