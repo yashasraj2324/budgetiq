@@ -283,3 +283,154 @@ mobile-ready. The onboarding data page uses responsive grids (`sm:grid-cols-2`,
 *Limitations: interior pages were code-verified, not pixel-verified (auth-gated).
 A short usability session with a finance-persona participant would validate the
 IA and touch-target findings with real usage data before the demo.*
+
+---
+
+# Part 2 — Visual & Aesthetic Refinement Roadmap (Quick Wins)
+
+## Context
+
+Following the Part 1 UX audit, this roadmap targets **visual appearance only**,
+per stakeholder direction. Scope confirmed by decision: (1) introduce a
+**success-green semantic** for positive financial values; (2) execute the
+**quick-wins cluster** — color harmonization, chart colors, radius consistency,
+onboarding header cleanup, and dashboard metric-card icon chips. Reference style
+profile: "Data-Dense Dashboard" (KPI cards, grid layout, minimal padding, green
+positive indicators, WCAG AA).
+
+## A. Success-green semantic for positive values
+
+**Problem:** "Reallocatable surplus" and other positive metrics render in the
+burnt-orange `secondary` (#904d00 / container #fe932c), which reads as a warning
+in a finance context; no positive color exists in the palette.
+
+**Plan:**
+- Add tokens to `tailwind.config.ts`: `success: "#1a7f37"`,
+  `on-success: "#ffffff"`, `success-container: "#d7f3e3"`,
+  `on-success-container: "#0b3d22"`.
+- Re-point positive-value surfaces from `secondary`/orange to `success`:
+  - `src/pages/dashboard.tsx` — "Reallocatable" card value and its
+    "Generate →" footer link: `text-secondary` → `text-success`.
+  - `src/pages/signals.tsx` — surplus figure `text-secondary` → `text-success`.
+  - `src/pages/recommendations.tsx` — modal source-option surplus value gains a
+    `text-success` tint.
+- Keep `secondary`/orange for warning/attention surfaces only (Modified status,
+  severity badges, overdue escalation) — no semantic confusion.
+
+**Rationale:** green = available capital (finance convention); removes the
+"warning" reading of surplus at a glance.
+
+## B. Chart token colors (`src/components/RechartsChart.tsx`)
+
+**Problem:** hardcoded pastel hex fills (#ffb4ab pink, #c3e7ff blue, #e0e2ec
+gray) clash with the token palette; ticks use `#888`.
+
+**Plan:**
+- Projected bars → `rgba(37, 99, 235, 0.35)` (primary-container-derived);
+  actual bars → `rgba(220, 233, 255, 1)` (surface-container-high-derived);
+  anomaly bars → `rgba(255, 183, 125, 1)` (secondary-fixed, attention).
+- Axis ticks → `#626570` (outline token).
+- Add a subtle dashed `CartesianGrid` in `outline-variant` for data
+  scannability; tooltip background `surface-container-lowest`, border
+  `outline-variant`, text `on-surface`.
+
+**Rationale:** the chart becomes palette-consistent — the dashboard is the first
+visual judges see.
+
+## C. Radius consistency (quick system pass)
+
+**Problem:** `rounded` = 2px on cards/tables/buttons/inputs sits beside
+`rounded-xl` (8px) and pills — a sharp-vs-round mix that reads as template
+default.
+
+**Plan:** one radius language — surfaces & inputs 8px, pills/badges/avatars
+`rounded-full`.
+- Card/table containers currently `rounded` → `rounded-xl` (dashboard metric
+  cards + table, reports/audit/approvals tables).
+- Primary/secondary buttons currently `rounded` → `rounded-lg` (dashboard,
+  signals, recommendations, settings, governance, import, onboarding pages).
+- Form inputs `rounded` → `rounded-lg`.
+- Badges/chips stay `rounded-full` (most already are).
+
+## D. Onboarding header cleanup (`src/pages/onboarding.tsx`)
+
+**Problem:** the workspace page still carries a marketing header ("256-Bit
+Financial Encryption", "Enterprise security controls") unlike the lean step
+pages, and prefills `defaultValue="Acme Technologies Inc."` — a foreign company
+name can appear on stage.
+
+**Plan:**
+- Remove the marketing header strip entirely (steps 2–4 have no header).
+- Replace the prefilled company name with an empty `placeholder="Enter company
+  name"`.
+- Convert the right-card classes to tokens: `bg-surface-container-lowest border
+  border-outline-variant rounded-xl shadow-sm` (drop `bg-white`/`border-slate-*`).
+
+**Rationale:** onboarding becomes one coherent system; removes demo-artifact look.
+
+## E. Dashboard metric-card icon chips (`src/pages/dashboard.tsx`)
+
+**Plan:** each of the 4 metric cards gets a tinted icon container instead of a
+bare glyph:
+- Total Allocated (`account_balance_wallet`): `bg-primary-container/15
+  text-primary rounded-lg p-2`
+- Total Remaining (`savings`): `bg-primary/10 text-primary rounded-lg p-2`
+- Reallocatable (`swap_horiz`): `bg-success-container text-success rounded-lg
+  p-2` (new semantic)
+- Pending Reviews (`verified_user`): `bg-secondary-fixed/40 text-secondary
+  rounded-lg p-2`
+
+**Rationale:** a designed focal element per card; icon-chip color encodes the
+metric's meaning (neutral / positive / attention).
+
+## Files to modify
+
+- `tailwind.config.ts` — success token set
+- `src/components/RechartsChart.tsx` — fills, grid, ticks, tooltip
+- `src/pages/dashboard.tsx` — success colors, icon chips, card radii
+- `src/pages/signals.tsx` — surplus → success
+- `src/pages/recommendations.tsx` — surplus tint, button/input radii
+- `src/pages/onboarding.tsx` — header removal, default value, card tokens
+- `src/components/ApprovalsTable.tsx`, `src/pages/reports.tsx`,
+  `src/pages/audit.tsx` — container radius pass
+- `src/pages/settings.tsx`, `src/pages/governance.tsx`,
+  `src/pages/import.tsx` — input/button radius pass
+
+## Implementation checklist
+
+- [ ] Add `success` / `on-success` / `success-container` / `on-success-container`
+      tokens to `tailwind.config.ts`.
+- [ ] `dashboard.tsx`: Reallocatable value + footer link use `text-success`;
+      swap_horiz card icon gets `bg-success-container text-success rounded-lg
+      p-2`; remaining 3 cards get tinted icon containers; metric cards and table
+      container use `rounded-xl`.
+- [ ] `signals.tsx`: surplus figure `text-success`; signal card container
+      `rounded-xl`.
+- [ ] `recommendations.tsx`: source-option surplus gains `text-success`;
+      generate modal buttons and selects use `rounded-lg`.
+- [ ] `RechartsChart.tsx`: token-derived bar fills, outline tick color, dashed
+      outline-variant CartesianGrid, token tooltip styling.
+- [ ] `onboarding.tsx`: marketing header removed; company name input has no
+      defaultValue (placeholder only); card uses token classes.
+- [ ] Radius pass on `ApprovalsTable.tsx`, `reports.tsx`, `audit.tsx`,
+      `settings.tsx`, `governance.tsx`, `import.tsx` (cards/buttons/inputs →
+      8px, pills stay full).
+- [ ] Grep confirms no `rounded ` (2px) remains on card/input/button surfaces in
+      the touched files.
+
+## Verification checklist
+
+- [ ] `pnpm build` and `pnpm lint` pass with zero errors.
+- [ ] Contrast: computed ratio for `success #1a7f37` on `#f8f9ff` is ≥ 4.5:1
+      (normal text) and for `on-success #ffffff` on `success #1a7f37` is ≥ 4.5:1.
+- [ ] Screenshot `mobile_390` and `desktop_1280` of login + signup: unchanged
+      clean rendering; onboarding workspace page no longer shows "Acme
+      Technologies Inc." and has no marketing header.
+- [ ] Interior (code-verified, auth-gated): dashboard shows 4 tinted icon chips,
+      success-green Reallocatable, rounded-xl cards, token-colored chart with
+      grid; surplus values are green on signals; modified/warning surfaces keep
+      orange.
+- [ ] No new motion added; `prefers-reduced-motion` rules from Part 1 still
+      intact.
+- [ ] Functional regression: login → onboarding → dashboard → signals →
+      generate → approve still completes (status 200s on gateway calls).
