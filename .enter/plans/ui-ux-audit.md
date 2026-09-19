@@ -571,3 +571,148 @@ reduced-motion-safe per Part 1 rules.
       0.
 - [ ] Functional regression: generate → open detail → approve still returns 200
       and the hero values match the recommendation amount and line guardrails.
+
+---
+
+# Part 4 — Experience Depth Cluster
+
+## Context
+
+Remaining work beyond Parts 1–3 (usability, quick wins, demo wow — all
+executed). Per stakeholder decision, this cluster covers four experience-depth
+items: responsive shell, onboarding back-navigation, toast notifications, and
+standardized empty states.
+
+## E1. Responsive shell (`src/components/Shell.tsx`)
+
+**Problem:** the sidebar is a fixed `w-[240px]` rail with `pl-[240px]` main at
+every viewport — unusable on phones (currently gated by a "desktop recommended"
+notice from Part 1).
+
+**Plan (three breakpoints, no layout-sheet rewrite):**
+- Add `const [menuOpen, setMenuOpen] = useState(false)` and a hamburger button
+  in the header (`lg:hidden`), wired to toggle the drawer and reset on route
+  change.
+- Sidebar classes: `fixed left-0 top-0 h-screen w-[240px] ... transform
+  transition-transform duration-200 -translate-x-full lg:translate-x-0` with
+  `menuOpen && "translate-x-0"` for the `< lg` off-canvas drawer; overlay
+  backdrop (`lg:hidden`, click-to-close) when open.
+- Main padding: `pl-[64px] md:pl-[64px] lg:pl-[240px]` — at `md`/`lg` show an
+  icon rail (hide nav labels with `hidden lg:inline`; hide the "Workspace"/
+  "Administration" labels and the footer period chip below `lg`).
+- Nav rows already have `min-h-11` (44px) from Part 1 — keep.
+
+**Rationale:** the single largest remaining UX gap; makes the interior app
+usable on mobile and tablets while desktop stays pixel-identical.
+
+## E2. Onboarding back-navigation
+
+**Problem:** the 4-step flow only moves forward; a wrong input at step 3 forces
+a browser back (which can resubmit).
+
+**Plan:**
+- `src/pages/onboarding/data.tsx`: add a "← Back to workspace" link above the
+  step label → `/onboarding`.
+- `src/pages/onboarding/priorities.tsx`: "← Back to data" → `/onboarding/data`.
+- `src/pages/onboarding/policies.tsx`: "← Back to priorities" →
+  `/onboarding/priorities`.
+- Style: `text-outline hover:text-on-surface font-body-sm flex items-center
+  gap-1` (same pattern as the recommendation detail back link).
+
+**Rationale:** cheapest navigation-correctness win on the demo path; no state
+loss since steps persist server-side.
+
+## E3. Toast notifications
+
+**Problem:** mutation feedback is inline-only; actions that succeed off-screen
+(e.g., a save while scrolled) give no confirmation.
+
+**Plan:**
+- New `src/components/Toast.tsx`: a module-level event bus (`toast(message,
+  type)` with subscribe) + a single fixed bottom-right stack rendered inside
+  `Shell.tsx` (so it exists on every interior page). Variants: success
+  (success-container), error (error-container), info (surface-container-high).
+  Auto-dismiss ~3.5s; `role="status"` / `role="alert"`.
+- Fire toasts on high-value mutations: import success/error
+  (`src/pages/import.tsx`), settings saves (org, fiscal, invite created, API
+  key created/revoked/rotated — `src/pages/settings.tsx`), approval
+  actions (`src/components/ApprovalsTable.tsx`), scenario ops
+  (`src/pages/scenarios.tsx`), spend entry added
+  (`src/pages/budget-lines/[id].tsx`).
+- Keep existing inline messages (they are AA-announced); toasts are additive
+  confirmation, not a replacement.
+
+**Rationale:** confirms off-screen outcomes; consistent, dismissible, and
+reduced-motion-safe (transition 150ms).
+
+## E4. Standardized empty states
+
+**Problem:** empty states are plain text rows except signals (which has a good
+icon state); recommendations/audit/reports/scenarios/settings are inconsistent.
+
+**Plan:**
+- New `src/components/EmptyState.tsx`: `{ icon, title, description, action }`
+  rendered as a centered card (`py-10 flex flex-col items-center gap-2
+  text-center`), icon in a `w-12 h-12 rounded-full bg-surface-container-low
+  text-outline` container, optional action button/link.
+- Apply to: recommendations (no recs → "Generate one" action),
+  `ApprovalsTable` (no pending), audit (no events match), scenarios (create
+  action), settings (no members / no invitations / no API keys — compact
+  variant), signals (align existing check_circle state to the component),
+  dashboard budget-lines (no lines → "Import data" link).
+
+**Rationale:** one consistent empty-state grammar; every table communicates
+*what to do next* instead of a bare "none".
+
+## Files to modify
+
+- `src/components/Shell.tsx` — responsive shell + Toast mount
+- `src/components/Toast.tsx` — new
+- `src/components/EmptyState.tsx` — new
+- `src/pages/onboarding/data.tsx`, `priorities.tsx`, `policies.tsx` — back
+  links
+- `src/pages/import.tsx`, `settings.tsx`, `scenarios.tsx`,
+  `src/pages/budget-lines/[id].tsx`, `src/components/ApprovalsTable.tsx` —
+  toast fires
+- `src/pages/recommendations.tsx`, `src/pages/audit.tsx`, `signals.tsx`,
+  `src/pages/dashboard.tsx` — EmptyState usage
+
+## Implementation checklist
+
+- [ ] `Shell.tsx`: hamburger (lg:hidden), `menuOpen` state reset on route
+      change, sidebar transform drawer + backdrop for `< lg`, `pl-[64px]
+      lg:pl-[240px]` main, nav labels hidden below lg, footer chip hidden below
+      lg.
+- [ ] `Toast.tsx` created; `Shell.tsx` renders the toast stack; `toast()`
+      export works on interior pages.
+- [ ] Toasts fired on: import success/error, org/fiscal save, invite created,
+      API key created/rotated/revoked, approve/modify/reject, scenario
+      create/duplicate/delete/share, spend entry added.
+- [ ] Back links added to the three onboarding step pages with the standard
+      back-link styling.
+- [ ] `EmptyState.tsx` created; applied to recommendations, approvals, audit,
+      scenarios, signals (aligned), dashboard budget-lines, and the compact
+      members/invitations/api-keys states in settings.
+- [ ] Grep confirms no bare "No … yet." text rows remain on the six target
+      surfaces without an EmptyState.
+
+## Verification checklist
+
+- [ ] `pnpm build` and `pnpm lint` pass with zero errors.
+- [ ] Screenshot `mobile_390` of an interior route with a session: hamburger
+      opens the drawer, nav labels hidden, backdrop closes it, content width ≥
+      usable.
+- [ ] Screenshot `desktop_1280`: sidebar and layout unchanged from current
+      state (icon rail/desktop parity confirmed).
+- [ ] Onboarding: each step shows a back link that lands on the previous step
+      without resubmitting.
+- [ ] Toasts appear bottom-right and auto-dismiss on: import success, an
+      approve action, and an API-key revoke; error variant shows on a failed
+      import.
+- [ ] EmptyState renders on: recommendations (with working "Generate one"),
+      audit with no matches, scenarios, and signals; compact variant in
+      settings when members/keys are absent.
+- [ ] Reduced-motion: toast/backdrop transitions respect the Part 1 global
+      rule.
+- [ ] Functional regression: signup → onboarding → import → dashboard → signals
+      → generate → approve still completes with 200s.
