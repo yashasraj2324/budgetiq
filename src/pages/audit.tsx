@@ -2,6 +2,7 @@
 import { Shell } from "@/components/Shell";
 import { useState, useEffect } from "react";
 import { API, apiFetch } from "@/lib/api";
+import { EmptyState } from "@/components/EmptyState";
 import { decisionId, formatMoney, useOrgCurrency } from "@/lib/format";
 
 interface AuditEvent {
@@ -127,7 +128,7 @@ export default function AuditPage() {
           {loading ? (
             <div className="py-16 text-center text-outline font-body-md">Loading audit events…</div>
           ) : filtered.length === 0 ? (
-            <div className="py-16 text-center text-outline font-body-md">No audit events match the current filter.</div>
+            <EmptyState icon="receipt_long" title="No audit events match the current filter." description="Adjust the filter or export the full log." />
           ) : (
             <table className="w-full text-left border-collapse">
               <thead>

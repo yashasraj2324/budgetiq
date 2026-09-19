@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { trackEvent } from "@enter-pro/analytics-sdk";
 import { API, apiError, apiFetch } from "@/lib/api";
 
@@ -247,6 +247,7 @@ export default function DataPage() {
   return (
     <main className="min-h-screen bg-background px-4 py-12 text-on-surface font-body-md">
       <div className="mx-auto max-w-4xl">
+        <Link to="/onboarding" className="inline-flex items-center gap-1 text-outline hover:text-on-surface font-body-sm mb-2">&larr; Back to workspace</Link>
         <p className="font-label-caps text-label-caps uppercase tracking-wider text-primary">Step 2 of 4 · Data setup</p>
         <h1 className="mt-3 font-headline-xl text-headline-xl font-bold">Add your budget data</h1>
         <p className="mt-2 text-on-surface-variant">

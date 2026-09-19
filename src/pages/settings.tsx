@@ -4,6 +4,8 @@ import { Shell } from "@/components/Shell";
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { API, apiError, apiFetch } from "@/lib/api";
+import { EmptyState } from "@/components/EmptyState";
+import { toast } from "@/lib/toast";
 import { trackEvent } from '@enter-pro/analytics-sdk';
 
 interface WorkspaceConfig {
@@ -149,6 +151,7 @@ export default function SettingsPage() {
 
     setConfig(await response.json());
     setMessage("Organization settings saved.");
+    toast("Organization settings saved.", "success");
   }
 
   async function saveFiscalCalendar(event: FormEvent<HTMLFormElement>) {
@@ -169,6 +172,7 @@ export default function SettingsPage() {
 
     setCalendar(await response.json());
     setMessage("Fiscal calendar saved.");
+    toast("Fiscal calendar saved.", "success");
   }
 
   async function updateMemberRole(memberId: string, role: string) {
@@ -227,6 +231,7 @@ export default function SettingsPage() {
       const link = invitationLink(invitation.token);
       setInviteLinks((previous) => ({ ...previous, [invitation.id]: link }));
       setMessage(`Invitation created for ${invitation.email}. Invite link ready to copy below.`);
+      toast("Invitation created.", "success");
     } else {
       setMessage(`Invitation created for ${invitation.email}.`);
     }
@@ -306,6 +311,7 @@ export default function SettingsPage() {
     setNewKeyScopes(["budgets:read"]);
     setNewKeyExpiryDays(30);
     setMessage("API key created.");
+    toast("API key created.", "success");
     trackEvent('api_key_created', { eventType: 'custom' });
     await reload();
   }
@@ -324,6 +330,7 @@ export default function SettingsPage() {
     const rotated = (await response.json()) as ApiKeyItem;
     setNewlyCreatedSecret(rotated.key ?? null);
     setMessage("API key rotated.");
+    toast("API key rotated.", "success");
     await reload();
   }
 
@@ -341,6 +348,7 @@ export default function SettingsPage() {
       previous.map((key) => (key.id === keyId ? { ...key, revoked_at: new Date().toISOString() } : key)),
     );
     setMessage("API key revoked.");
+    toast("API key revoked.", "info");
   }
 
   const periodLabelsInput = useMemo(() => calendar.period_labels.join(", "), [calendar.period_labels]);
@@ -507,7 +515,7 @@ export default function SettingsPage() {
                         </div>
                       </div>
                     ))}
-                    {!members.length && <p className="text-sm text-outline">No active members.</p>}
+                    {!members.length && <EmptyState compact icon="group" title="No members yet" description="Invite a teammate to collaborate." />}
                   </div>
                 </div>
 
@@ -540,7 +548,7 @@ export default function SettingsPage() {
                         </div>
                       </div>
                     ))}
-                    {!invitations.length && <p className="text-sm text-outline">No pending invitations.</p>}
+                    {!invitations.length && <EmptyState compact icon="mail" title="No pending invitations" description="Invitations appear here once sent." />}
                   </div>
                 </div>
               </div>
@@ -589,7 +597,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 ))}
-                {!apiKeys.length && <p className="text-sm text-outline">No API keys configured.</p>}
+                {!apiKeys.length && <EmptyState compact icon="key" title="No API keys configured" description="Create a scoped key for programmatic access." />}
               </div>
             </div>
 

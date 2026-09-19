@@ -5,6 +5,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import { RechartsChart } from "@/components/RechartsChart";
 import { Shell } from "@/components/Shell";
 import { API, apiError, apiFetch } from "@/lib/api";
+import { EmptyState } from "@/components/EmptyState";
 import { formatCompact, formatMoney } from "@/lib/format";
 
 interface BudgetLineRow {
@@ -397,7 +398,14 @@ export default function DashboardPage() {
                             <tbody className="divide-y divide-outline-variant">
                 {all_budget_lines.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-outline">No budget lines found.</td>
+                    <td colSpan={6}>
+                      <EmptyState
+                        icon="space_dashboard"
+                        title="No budget lines found"
+                        description="Import your budget data to start monitoring spend and signals."
+                        action={<Link to="/import" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary/90 transition-colors">Import data</Link>}
+                      />
+                    </td>
                   </tr>
                 )}
                 {all_budget_lines.map((line, i) => {

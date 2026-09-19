@@ -3,6 +3,7 @@ import { Shell } from "@/components/Shell";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { API, apiFetch } from "@/lib/api";
+import { EmptyState } from "@/components/EmptyState";
 import { formatMoney, useOrgCurrency } from "@/lib/format";
 
 interface AnomalySignal {
@@ -132,10 +133,12 @@ export default function SignalsPage() {
             ))}
           </div>
         ) : signals.length === 0 ? (
-          <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-xl text-center">
-            <span className="material-symbols-outlined text-[48px] text-outline mb-space-md block">check_circle</span>
-            <h2 className="font-headline-md text-on-surface">No Active Anomalies</h2>
-            <p className="font-body-md text-on-surface-variant mt-2">No velocity or allocation anomalies detected in the current budget data.</p>
+          <div className="bg-surface-container-lowest rounded-xl border border-outline-variant">
+            <EmptyState
+              icon="check_circle"
+              title="No Active Anomalies"
+              description="No velocity or allocation anomalies detected in the current budget data."
+            />
           </div>
         ) : (
           <div className="flex flex-col gap-space-md">

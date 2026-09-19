@@ -4,6 +4,8 @@ import { Shell } from "@/components/Shell";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API, apiError, apiFetch } from "@/lib/api";
+import { EmptyState } from "@/components/EmptyState";
+import { toast } from "@/lib/toast";
 
 interface ScenarioFilters {
   department_id?: number | null;
@@ -98,6 +100,7 @@ export default function ScenariosPage() {
       setCategory("");
       setSearch("");
       setMessage("Scenario created.");
+      toast("Scenario created.", "success");
       await loadScenarios();
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Failed to create scenario");
@@ -117,6 +120,7 @@ export default function ScenariosPage() {
     }
     setScenarios((previous) => previous.filter((item) => item.id !== id));
     setMessage("Scenario deleted.");
+    toast("Scenario deleted.", "info");
   }
 
   async function duplicateScenario(id: number) {
@@ -128,6 +132,7 @@ export default function ScenariosPage() {
       return;
     }
     setMessage("Scenario duplicated.");
+    toast("Scenario duplicated.", "success");
     await loadScenarios();
   }
 
@@ -146,6 +151,7 @@ export default function ScenariosPage() {
     const updated = (await response.json()) as Scenario;
     setScenarios((previous) => previous.map((item) => (item.id === updated.id ? updated : item)));
     setMessage(updated.shared ? "Scenario shared organization-wide." : "Scenario set to private.");
+    toast(updated.shared ? "Scenario shared." : "Scenario set to private.", "info");
   }
 
   async function saveName(scenario: Scenario) {
@@ -172,6 +178,7 @@ export default function ScenariosPage() {
     setEditingId(null);
     setEditName("");
     setMessage("Scenario updated.");
+    toast("Scenario updated.", "success");
   }
 
   return (
@@ -227,7 +234,7 @@ export default function ScenariosPage() {
           {loading ? (
             <div className="p-8 text-center text-outline">Loading scenarios...</div>
           ) : scenarios.length === 0 ? (
-            <div className="p-8 text-center text-outline">No scenarios saved yet.</div>
+            <EmptyState icon="bookmarks" title="No scenarios saved yet" description="Create a reusable filter set and open it on the dashboard." />
           ) : (
             <table className="w-full text-left">
               <thead>

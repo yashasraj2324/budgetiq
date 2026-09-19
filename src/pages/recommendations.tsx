@@ -2,6 +2,8 @@
 import { Shell } from "@/components/Shell";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { EmptyState } from "@/components/EmptyState";
+import { toast } from "@/lib/toast";
 import { API, apiFetch } from "@/lib/api";
 import { trackEvent } from '@enter-pro/analytics-sdk';
 import { decisionId, formatMoney, useOrgCurrency } from "@/lib/format";
@@ -78,6 +80,7 @@ export default function RecommendationsPage() {
     if (res.ok) {
       const data = await res.json();
       trackEvent('recommendation_generated', { eventType: 'conversion', properties: { amount: Number(data.amount) || 0 } });
+      toast("Recommendation generated.", "success");
       navigate(`/recommendations/${data.id}`);
     } else {
       const body = await res.json().catch(() => ({ detail: "Unknown error" }));
@@ -124,7 +127,22 @@ export default function RecommendationsPage() {
                 <tr><td colSpan={5} className="py-8 text-center text-outline">Loading…</td></tr>
               )}
               {!loading && recs.length === 0 && (
-                <tr><td colSpan={5} className="py-8 text-center text-outline">No recommendations yet. <button type="button" onClick={() => { setShowModal(true); setGenError(""); }} className="text-primary hover:underline font-medium">Generate one</button> to get started.</td></tr>
+                <tr><td colSpan={5}>
+                  <EmptyState
+                    icon="auto_awesome"
+                    title="No recommendations yet"
+                    description="Generate a reallocation proposal from any surplus budget line."
+                    action={
+                      <button
+                        type="button"
+                        onClick={() => { setShowModal(true); setGenError(""); }}
+                        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary/90 transition-colors"
+                      >
+                        Generate one
+                      </button>
+                    }
+                  />
+                </td></tr>
               )}
               {recs.map(rec => (
                 <tr key={rec.id} className="hover:bg-surface-container transition-colors duration-100">

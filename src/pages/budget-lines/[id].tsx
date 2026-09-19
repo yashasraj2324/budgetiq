@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import { Shell } from "@/components/Shell";
 import { API, apiFetch, apiError } from "@/lib/api";
 import { trackEvent } from '@enter-pro/analytics-sdk';
+import { toast } from "@/lib/toast";
 import { formatMoney, currencySymbol, useOrgCurrency } from "@/lib/format";
 
 interface Detail {
@@ -66,6 +67,7 @@ export default function BudgetLineDetailPage() {
       setSpendPeriod("");
       setSpendAmount("");
       trackEvent('spend_entry_added', { eventType: 'custom', properties: { amount } });
+      toast("Spend entry recorded.", "success");
       load();
     } catch (reason) {
       setSpendError(reason instanceof Error ? reason.message : "Unable to record spend");

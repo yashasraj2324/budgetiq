@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import { API, apiFetch } from "@/lib/api";
 import { trackEvent } from '@enter-pro/analytics-sdk';
+import { EmptyState } from "@/components/EmptyState";
+import { toast } from "@/lib/toast";
 import { decisionId, currencySymbol, formatMoney, useOrgCurrency } from "@/lib/format";
 
 interface BudgetLine { id: number; name: string; }
@@ -62,6 +64,7 @@ export function ApprovalsTable({ initialData = [] }: { initialData?: Recommendat
       });
       if (res.ok) {
         trackEvent(action === "approve" ? 'recommendation_approved' : 'recommendation_rejected', { eventType: 'conversion' });
+        toast(action === "approve" ? "Recommendation approved." : "Recommendation rejected.", "success");
         refresh();
       } else {
         const body = await res.json().catch(() => ({ detail: "Action failed." }));
@@ -89,6 +92,7 @@ export function ApprovalsTable({ initialData = [] }: { initialData?: Recommendat
       });
       if (res.ok) {
         trackEvent('recommendation_modified', { eventType: 'conversion', properties: { amount } });
+        toast("Recommendation modified.", "success");
         setModifyRowId(null);
         refresh();
       } else {
@@ -124,7 +128,13 @@ export function ApprovalsTable({ initialData = [] }: { initialData?: Recommendat
           <tbody className="divide-y divide-outline-variant">
             {data.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-outline font-body-md text-body-md">No recommendations found.</td>
+                <td colSpan={5}>
+                  <EmptyState
+                    icon="task_alt"
+                    title="No recommendations found"
+                    description="Pending proposals appear here for approval."
+                  />
+                </td>
               </tr>
             )}
             {data.map((rec) => {

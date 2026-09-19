@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Shell } from "@/components/Shell";
 import { API, apiError, apiFetch } from "@/lib/api";
+import { toast } from "@/lib/toast";
 
 interface Result {
   ok?: boolean;
@@ -79,16 +80,17 @@ export default function ImportPage() {
       const body = (await response.json().catch(() => null)) as Result | null;
       if (response.ok) {
         setRes({ ok: true, created: body?.created ?? 0, updated: body?.updated ?? 0, errors: body?.errors ?? [] });
-        setMsg(
-          kind === "lines"
-            ? `Imported ${body?.created ?? 0} budget line(s).`
-            : `Imported ${body?.created ?? 0} spend entry(ies), updated ${body?.updated ?? 0}.`,
-        );
+        const successMessage = kind === "lines"
+          ? `Imported ${body?.created ?? 0} budget line(s).`
+          : `Imported ${body?.created ?? 0} spend entry(ies), updated ${body?.updated ?? 0}.`;
+        setMsg(successMessage);
+        toast(successMessage, "success");
         setFile(null);
       } else {
         const { errors, message } = extractErrors(body, await apiError(response, "Import failed."));
         setRes({ errors });
         setMsg(message);
+        toast(message, "error");
       }
     } catch {
       setMsg("Network error during upload.");

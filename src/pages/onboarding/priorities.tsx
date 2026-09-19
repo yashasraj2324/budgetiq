@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { API, apiError, apiFetch } from "@/lib/api";
 import { trackEvent } from '@enter-pro/analytics-sdk';
 
@@ -55,6 +55,7 @@ export default function PrioritiesPage() {
   return (
     <main className="min-h-screen bg-background px-4 py-12 text-on-surface font-body-md">
       <div className="mx-auto max-w-3xl">
+        <Link to="/onboarding/data" className="inline-flex items-center gap-1 text-outline hover:text-on-surface font-body-sm mb-2">&larr; Back to data</Link>
         <p className="font-label-caps text-label-caps uppercase tracking-wider text-primary">Step 3 of 4 · Engine calibration</p>
         <h1 className="mt-3 font-headline-xl text-headline-xl font-bold">Define your priorities</h1>
         <p className="mt-2 text-on-surface-variant">Set the relative importance of each budget line. These weights are persisted for your organization.</p>
