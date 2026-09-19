@@ -359,6 +359,12 @@ export default function DashboardPage() {
 
         </div>
 
+        {/* Charts row — burn velocity + utilisation, above the table */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-space-lg">
+          <RechartsChart />
+          <BudgetUtilisationDonut totalBudget={data.total_budget} totalRemaining={data.total_remaining} currency={currency} />
+        </div>
+
         {/* Budget Lines Table */}
         <div className="bg-surface-container-lowest rounded-xl shadow-sm flex flex-col overflow-hidden">
           <div className="p-space-lg bg-surface-container-lowest flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
@@ -462,12 +468,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-space-lg">
-          <RechartsChart />
-          <BudgetUtilisationDonut totalBudget={data.total_budget} totalRemaining={data.total_remaining} currency={currency} />
-        </div>
       </div>
     </Shell>
   );
