@@ -230,10 +230,10 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-lg">
 
           {/* Card 1: Total Budget */}
-          <div className="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col justify-between">
+          <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between">
             <div className="flex items-start justify-between">
               <span className="font-label-caps text-label-caps uppercase text-outline">Total Allocated</span>
-              <span className="material-symbols-outlined text-outline text-[18px]">account_balance_wallet</span>
+              <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary-container/15 text-primary"><span className="material-symbols-outlined text-[18px]">account_balance_wallet</span></span>
             </div>
             <div className="my-space-md">
               <div className="font-numeric-metric-lg text-numeric-metric-lg text-on-surface tracking-tight font-semibold">
@@ -247,10 +247,10 @@ export default function DashboardPage() {
           </div>
 
           {/* Card 2: Total Remaining */}
-          <div className="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col justify-between">
+          <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between">
             <div className="flex items-start justify-between">
               <span className="font-label-caps text-label-caps uppercase text-outline">Total Remaining</span>
-              <span className="material-symbols-outlined text-primary text-[18px]">savings</span>
+              <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary"><span className="material-symbols-outlined text-[18px]">savings</span></span>
             </div>
             <div className="my-space-md">
               <div className="font-numeric-metric-lg text-numeric-metric-lg text-primary tracking-tight font-semibold">
@@ -268,28 +268,28 @@ export default function DashboardPage() {
           </div>
 
           {/* Card 3: Reallocatable Surplus */}
-          <div className="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col justify-between">
+          <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between">
             <div className="flex items-start justify-between">
               <span className="font-label-caps text-label-caps uppercase text-outline">Reallocatable</span>
-              <span className="material-symbols-outlined text-secondary text-[18px]">swap_horiz</span>
+              <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-success-container text-success"><span className="material-symbols-outlined text-[18px]">swap_horiz</span></span>
             </div>
             <div className="my-space-md">
-              <div className="font-numeric-metric-lg text-numeric-metric-lg text-secondary tracking-tight font-semibold">
+              <div className="font-numeric-metric-lg text-numeric-metric-lg text-success tracking-tight font-semibold">
                 {formatINR(data.reallocatable)}
               </div>
               <div className="font-code-sm text-code-sm text-outline mt-1">After reserves &amp; future spend</div>
             </div>
             <div className="pt-space-sm flex items-center justify-between">
               <span className="font-code-sm text-code-sm text-outline">Transferable surplus</span>
-              <Link to="/recommendations" className="font-code-sm text-code-sm text-secondary font-medium hover:underline">Generate &rarr;</Link>
+              <Link to="/recommendations" className="font-code-sm text-code-sm text-success font-medium hover:underline">Generate &rarr;</Link>
             </div>
           </div>
 
           {/* Card 4: Pending + Anomalies */}
-          <div className="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col justify-between">
+          <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between">
             <div className="flex items-start justify-between">
               <span className="font-label-caps text-label-caps uppercase text-outline">Pending Reviews</span>
-              <span className="material-symbols-outlined text-primary-container text-[18px]">verified_user</span>
+              <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-secondary-fixed/40 text-secondary"><span className="material-symbols-outlined text-[18px]">verified_user</span></span>
             </div>
             <div className="my-space-md flex flex-col gap-space-xs">
               <div className="flex items-baseline gap-space-sm">
@@ -312,7 +312,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Budget Lines Table */}
-        <div className="bg-surface-container-lowest rounded shadow-sm flex flex-col overflow-hidden">
+        <div className="bg-surface-container-lowest rounded-xl shadow-sm flex flex-col overflow-hidden">
           <div className="p-space-lg bg-surface-container-lowest flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
             <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-space-sm">

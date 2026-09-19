@@ -54,6 +54,10 @@ const config: Config = {
         "surface-container-high": "#dce9ff",
         "on-tertiary-fixed": "#131b2e",
         "primary": "#004ac6",
+        "success": "#1a7f37",
+        "on-success": "#ffffff",
+        "success-container": "#d7f3e3",
+        "on-success-container": "#0b3d22",
         "inverse-surface": "#213145",
         "on-tertiary": "#ffffff",
         "surface-dim": "#cbdbf5"

@@ -143,7 +143,7 @@ export default function ImportPage() {
             <button
               onClick={() => void upload("lines", lineFile)}
               disabled={busy !== null}
-              className="rounded bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-50"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-50"
             >
               {busy === "lines" ? "Uploading…" : "Upload budget lines"}
             </button>
@@ -198,7 +198,7 @@ export default function ImportPage() {
             <button
               onClick={() => void upload("spend", spendFile)}
               disabled={busy !== null}
-              className="rounded bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-50"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-50"
             >
               {busy === "spend" ? "Uploading…" : "Upload spend entries"}
             </button>

@@ -393,19 +393,19 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-space-md">
                 <label className="block text-sm text-on-surface">
                   Organization
-                  <input name="org_name" defaultValue={config.org_name ?? ""} required className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface" />
+                  <input name="org_name" defaultValue={config.org_name ?? ""} required className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface" />
                 </label>
                 <label className="block text-sm text-on-surface">
                   Fiscal year label
-                  <input name="fiscal_year" defaultValue={config.fiscal_year ?? ""} required className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface" />
+                  <input name="fiscal_year" defaultValue={config.fiscal_year ?? ""} required className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface" />
                 </label>
                 <label className="block text-sm text-on-surface">
                   Currency
-                  <input name="currency" maxLength={3} defaultValue={config.currency ?? "INR"} required className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface uppercase" />
+                  <input name="currency" maxLength={3} defaultValue={config.currency ?? "INR"} required className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface uppercase" />
                 </label>
               </div>
               <div className="flex justify-end">
-                <button type="submit" className="rounded bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Save organization</button>
+                <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Save organization</button>
               </div>
             </form>
 
@@ -422,7 +422,7 @@ export default function SettingsPage() {
                     onChange={(event) =>
                       setCalendar((previous) => ({ ...previous, fiscal_year_start_month: Number(event.target.value || 1) }))
                     }
-                    className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface"
+                    className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface"
                   />
                 </label>
                 <label className="block text-sm text-on-surface">
@@ -435,7 +435,7 @@ export default function SettingsPage() {
                         period_type: event.target.value as FiscalCalendar["period_type"],
                       }))
                     }
-                    className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface"
+                    className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface"
                   >
                     <option value="monthly">monthly</option>
                     <option value="quarterly">quarterly</option>
@@ -455,12 +455,12 @@ export default function SettingsPage() {
                           .filter(Boolean),
                       }))
                     }
-                    className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface"
+                    className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface"
                   />
                 </label>
               </div>
               <div className="flex justify-end">
-                <button type="submit" className="rounded bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Save fiscal calendar</button>
+                <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Save fiscal calendar</button>
               </div>
             </form>
 
@@ -469,20 +469,20 @@ export default function SettingsPage() {
               <form onSubmit={createInvitation} className="grid grid-cols-1 md:grid-cols-4 gap-space-md">
                 <label className="block text-sm text-on-surface md:col-span-2">
                   Invite email
-                  <input type="email" required value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface" />
+                  <input type="email" required value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface" />
                 </label>
                 <label className="block text-sm text-on-surface">
                   Role
-                  <select value={inviteRole} onChange={(event) => setInviteRole(event.target.value)} className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface">
+                  <select value={inviteRole} onChange={(event) => setInviteRole(event.target.value)} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface">
                     {roleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
                   </select>
                 </label>
                 <label className="block text-sm text-on-surface">
                   Expiry days
-                  <input type="number" min={1} max={90} value={inviteDays} onChange={(event) => setInviteDays(Number(event.target.value || 7))} className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface" />
+                  <input type="number" min={1} max={90} value={inviteDays} onChange={(event) => setInviteDays(Number(event.target.value || 7))} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface" />
                 </label>
                 <div className="md:col-span-4 flex justify-end">
-                  <button type="submit" className="rounded bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Invite member</button>
+                  <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Invite member</button>
                 </div>
               </form>
 
@@ -497,7 +497,7 @@ export default function SettingsPage() {
                           <select
                             value={member.role}
                             onChange={(event) => void updateMemberRole(member.user_id, event.target.value)}
-                            className="rounded border border-outline-variant px-2 py-1 bg-surface text-sm"
+                            className="rounded-lg border border-outline-variant px-2 py-1 bg-surface text-sm"
                           >
                             {roleOptions.map((role) => (
                               <option key={role} value={role}>{role}</option>
@@ -551,11 +551,11 @@ export default function SettingsPage() {
               <form onSubmit={createApiKey} className="grid grid-cols-1 md:grid-cols-4 gap-space-md">
                 <label className="block text-sm text-on-surface">
                   Name
-                  <input value={newKeyName} required onChange={(event) => setNewKeyName(event.target.value)} className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface" />
+                  <input value={newKeyName} required onChange={(event) => setNewKeyName(event.target.value)} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface" />
                 </label>
                 <label className="block text-sm text-on-surface">
                   Expiry (days)
-                  <input type="number" min={1} max={3650} value={newKeyExpiryDays} onChange={(event) => setNewKeyExpiryDays(Number(event.target.value || 30))} className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface" />
+                  <input type="number" min={1} max={3650} value={newKeyExpiryDays} onChange={(event) => setNewKeyExpiryDays(Number(event.target.value || 30))} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface" />
                 </label>
                 <label className="block text-sm text-on-surface md:col-span-2">
                   Scopes
@@ -565,13 +565,13 @@ export default function SettingsPage() {
                     onChange={(event) =>
                       setNewKeyScopes(Array.from(event.target.selectedOptions).map((option) => option.value))
                     }
-                    className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface min-h-24"
+                    className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface min-h-24"
                   >
                     {scopeOptions.map((scope) => <option key={scope} value={scope}>{scope}</option>)}
                   </select>
                 </label>
                 <div className="md:col-span-4 flex justify-end">
-                  <button type="submit" className="rounded bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Create API key</button>
+                  <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Create API key</button>
                 </div>
               </form>
 

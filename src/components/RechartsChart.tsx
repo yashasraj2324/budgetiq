@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from "recharts";
 import { API, apiFetch } from "@/lib/api";
 import { formatMoney, useOrgCurrency } from "@/lib/format";
 
@@ -96,11 +96,12 @@ export function RechartsChart() {
         {data.length ? (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data}>
-              <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#888" }} tickLine={false} axisLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(195, 198, 215, 0.5)" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#626570" }} tickLine={false} axisLine={false} />
               <YAxis hide />
               <Tooltip
-                cursor={{ fill: "transparent" }}
-                contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)" }}
+                cursor={{ fill: "rgba(195, 198, 215, 0.2)" }}
+                contentStyle={{ borderRadius: "8px", border: "1px solid #c3c6d7", boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)", background: "#ffffff", color: "#0b1c30" }}
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 formatter={((value: any) => [formatMoney(Number(value), currency), "Spend"]) as any}
               />
@@ -108,7 +109,7 @@ export function RechartsChart() {
                 {data.map((entry, index) => (
                   <Cell
                     key={`cell-${index}`}
-                    fill={entry.anomaly ? "#ffb4ab" : entry.projected ? "#c3e7ff" : "#e0e2ec"}
+                    fill={entry.anomaly ? "rgba(255, 183, 125, 1)" : entry.projected ? "rgba(37, 99, 235, 0.35)" : "rgba(220, 233, 255, 1)"}
                   />
                 ))}
               </Bar>

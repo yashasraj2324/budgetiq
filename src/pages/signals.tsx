@@ -217,7 +217,7 @@ export default function SignalsPage() {
                   <div className="flex items-center justify-between gap-space-md flex-wrap">
                     <div className="font-body-sm text-on-surface-variant">
                       Transferable surplus:{" "}
-                      <span className={`font-semibold ${surplusAmt > 0 ? "text-secondary" : "text-error"}`}>
+                      <span className={`font-semibold ${surplusAmt > 0 ? "text-success" : "text-error"}`}>
                         {formatINR(surplusAmt)}
                       </span>
                       {targets.length > 0 && (

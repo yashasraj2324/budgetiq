@@ -90,7 +90,7 @@ export default function AuditPage() {
           <button
             id="btn-export-audit-log-csv"
             onClick={handleExport}
-            className="flex items-center gap-space-xs px-space-md py-2 bg-surface-container-lowest text-on-surface font-body-sm font-medium rounded shadow-sm hover:bg-surface-container-low transition-colors border border-outline-variant"
+            className="flex items-center gap-space-xs px-space-md py-2 bg-surface-container-lowest text-on-surface font-body-sm font-medium rounded-lg shadow-sm hover:bg-surface-container-low transition-colors border border-outline-variant"
           >
             <span className="material-symbols-outlined text-[16px]">file_download</span>
             Export CSV
@@ -104,13 +104,13 @@ export default function AuditPage() {
             placeholder="Search actor or rec ID…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="rounded border border-outline-variant bg-surface-container-lowest px-space-md py-1.5 font-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary w-56"
+            className="rounded-lg border border-outline-variant bg-surface-container-lowest px-space-md py-1.5 font-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary w-56"
           />
           {["all", "approve", "modify", "reject"].map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-space-md py-1.5 rounded font-code-sm font-medium transition-colors ${
+              className={`px-space-md py-1.5 rounded-lg font-code-sm font-medium transition-colors ${
                 filter === f
                   ? "bg-primary text-on-primary"
                   : "bg-surface-container-lowest text-on-surface border border-outline-variant hover:bg-surface-container-low"

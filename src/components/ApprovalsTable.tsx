@@ -250,21 +250,21 @@ export function ApprovalsTable({ initialData = [] }: { initialData?: Recommendat
                         <button
                           onClick={() => handleAction(rec.id, "approve")}
                           disabled={isLoading}
-                          className="px-3 py-1 bg-primary text-on-primary font-body-sm font-medium rounded shadow-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
+                          className="px-3 py-1 bg-primary text-on-primary font-body-sm font-medium rounded-lg shadow-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
                         >
                           Approve
                         </button>
                         <button
                           onClick={() => openModify(rec.id, rec.amount)}
                           disabled={isLoading}
-                          className="px-3 py-1 bg-secondary-container text-on-secondary-container font-body-sm font-medium rounded shadow-sm hover:bg-secondary-container/80 transition-colors disabled:opacity-50"
+                          className="px-3 py-1 bg-secondary-container text-on-secondary-container font-body-sm font-medium rounded-lg shadow-sm hover:bg-secondary-container/80 transition-colors disabled:opacity-50"
                         >
                           Modify
                         </button>
                         <button
                           onClick={() => handleAction(rec.id, "reject")}
                           disabled={isLoading}
-                          className="px-3 py-1 bg-surface-container text-on-surface font-body-sm font-medium rounded shadow-sm hover:bg-surface-container-high transition-colors disabled:opacity-50"
+                          className="px-3 py-1 bg-surface-container text-on-surface font-body-sm font-medium rounded-lg shadow-sm hover:bg-surface-container-high transition-colors disabled:opacity-50"
                         >
                           Reject
                         </button>

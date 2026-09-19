@@ -185,7 +185,7 @@ export default function GovernancePage() {
           <form onSubmit={savePolicy} className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-space-lg space-y-space-lg">
             <div className="flex items-center justify-between">
               <h2 className="font-headline-md text-headline-md text-on-surface">Approval tiers</h2>
-              <button type="button" onClick={addTier} className="rounded border border-outline-variant px-3 py-1.5 text-sm hover:bg-surface-container-low">
+              <button type="button" onClick={addTier} className="rounded-lg border border-outline-variant px-3 py-1.5 text-sm hover:bg-surface-container-low">
                 Add tier
               </button>
             </div>
@@ -211,7 +211,7 @@ export default function GovernancePage() {
                       min={0}
                       value={tier.min_amount}
                       onChange={(event) => setTier(index, { min_amount: Number(event.target.value || 0) })}
-                      className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface"
+                      className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface"
                     />
                   </label>
                   <div className="space-y-2">
@@ -244,7 +244,7 @@ export default function GovernancePage() {
                   onChange={(event) =>
                     setPolicy((previous) => previous ? { ...previous, escalation_hours: Number(event.target.value || 1) } : previous)
                   }
-                  className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface"
+                  className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface"
                 />
               </label>
               <label className="flex items-center gap-2 text-sm text-on-surface mt-7">
@@ -271,7 +271,7 @@ export default function GovernancePage() {
                     .filter(Boolean);
                   setPolicy((previous) => previous ? { ...previous, delegated_approvers: delegated } : previous);
                 }}
-                className="mt-1 w-full rounded border border-outline-variant px-3 py-2 bg-surface"
+                className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface"
                 placeholder="u_123, u_456"
               />
             </label>
@@ -280,7 +280,7 @@ export default function GovernancePage() {
               <p className="text-xs text-outline">
                 Changes persist immediately after save and are applied to subsequent approval decisions.
               </p>
-              <button type="submit" disabled={saving} className="rounded bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-60">
+              <button type="submit" disabled={saving} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-60">
                 {saving ? "Saving..." : "Save policy"}
               </button>
             </div>

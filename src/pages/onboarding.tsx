@@ -7,11 +7,6 @@ import { trackEvent } from '@enter-pro/analytics-sdk';
 export default function OnboardingPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [userName] = useState(() => {
-    if (typeof window === "undefined") return "";
-    const stored = sessionStorage.getItem("budgetiq_actor_name");
-    return stored ? `${stored.toLowerCase().replace(/\s+/g, ".")}@enterprise.com` : "";
-  });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -44,38 +39,7 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-full min-h-screen bg-slate-50 text-slate-900 font-sans antialiased flex flex-col justify-between selection:bg-blue-100 selection:text-blue-900" style={{ fontFeatureSettings: "'cv02', 'cv03', 'cv04', 'cv11'" }}>
-      {/* Top Enterprise Navigation Header */}
-      <header className="w-full bg-white border-b border-slate-200 py-3.5 px-8 flex items-center justify-between z-10">
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-2">
-            <span className="text-lg font-bold tracking-tight text-slate-950">BudgetIQ</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block"></span>
-          </div>
-          <span className="text-xs text-slate-400 font-normal">|</span>
-          <span className="text-xs font-mono uppercase tracking-wider text-slate-500 font-medium">Finance Intelligence Gateway</span>
-        </div>
-
-        <div className="hidden md:flex items-center space-x-6 text-xs text-slate-500">
-          <div className="flex items-center space-x-1.5">
-            <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-            </svg>
-            <span className="font-mono">256-Bit Financial Encryption</span>
-          </div>
-          <div className="flex items-center space-x-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span className="font-medium text-slate-600">Enterprise security controls</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="material-symbols-outlined text-[16px] text-slate-400">person</span>
-            <span className="text-slate-500">
-              Signed in as <span className="font-medium text-slate-800">{userName}</span>
-            </span>
-          </div>
-        </div>
-      </header>
-
+    <div className="min-h-full min-h-screen bg-background text-on-surface font-sans antialiased flex flex-col justify-between" style={{ fontFeatureSettings: "'cv02', 'cv03', 'cv04', 'cv11'" }}>
       {/* Main Content Layout */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-12 flex items-center justify-center">
         <div className="w-full grid grid-cols-12 gap-12 lg:gap-16 items-start">
@@ -175,7 +139,7 @@ export default function OnboardingPage() {
 
           {/* RIGHT SIDE: Create Workspace Card */}
           <div className="col-span-12 lg:col-span-7">
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 sm:p-10">
+            <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-8 sm:p-10">
               {/* Card Header */}
               <div className="border-b border-slate-100 pb-6 mb-7">
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900">
@@ -202,7 +166,6 @@ export default function OnboardingPage() {
                       id="company-name"
                       name="company_name"
                       placeholder="Enter company name"
-                      defaultValue="Acme Technologies Inc."
                       className="w-full px-3.5 py-2.5 text-sm font-medium text-slate-900 bg-white border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-colors placeholder:text-slate-400"
                     />
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-emerald-600">
@@ -381,7 +344,7 @@ export default function OnboardingPage() {
       </main>
 
       {/* Enterprise Footer Compliance Strip */}
-      <footer className="w-full border-t border-slate-200 bg-white py-3 px-8 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2 mt-auto">
+      <footer className="w-full border-t border-outline-variant bg-surface-container-lowest py-3 px-8 text-xs text-on-surface-variant flex flex-col sm:flex-row items-center justify-between gap-2 mt-auto">
         <div className="flex items-center space-x-4 font-mono text-[11px]">
           <span>BudgetIQ Enterprise v4.19</span>
           <span>&middot;</span>
@@ -389,7 +352,7 @@ export default function OnboardingPage() {
           <span>&middot;</span>
           <span>Data source: manual and CSV ingestion</span>
         </div>
-        <div className="text-[11px] text-slate-400">
+        <div className="text-[11px] text-outline">
           &copy; 2025 BudgetIQ Systems Inc. All rights reserved.
         </div>
       </footer>
