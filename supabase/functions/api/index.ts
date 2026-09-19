@@ -113,13 +113,34 @@ async function resolveAuth(req: Request, supabase: ReturnType<typeof createClien
   let orgId: string;
   let role: string;
   {
-    const { data: membership } = await supabase
+    const { data: memberships } = await supabase
       .from("organization_members")
       .select("organization_id, role")
       .eq("user_id", userData.user.id)
-      .order("created_at", { ascending: true })
-      .maybeSingle();
-    if (membership) {
+      .order("created_at", { ascending: true });
+    if (memberships && memberships.length > 0) {
+      // A user can accumulate multiple auto-provisioned workspaces (each
+      // fresh signup/session creates one). Resolve to the ACTIVE workspace —
+      // the one holding the most budget lines — so re-login always lands on
+      // the org where data actually lives, instead of the oldest (often empty)
+      // workspace. Ties fall back to the most recently created membership.
+      let membership = memberships[0];
+      if (memberships.length > 1) {
+        const orgIds = memberships.map((m) => m.organization_id as string);
+        const { data: lineRows } = await supabase
+          .from("budget_lines")
+          .select("organization_id")
+          .in("organization_id", orgIds);
+        const tally = new Map<string, number>();
+        for (const row of lineRows ?? []) {
+          tally.set(row.organization_id as string, (tally.get(row.organization_id as string) ?? 0) + 1);
+        }
+        for (const m of memberships) {
+          const count = tally.get(m.organization_id as string) ?? 0;
+          // >= (not >) so equal counts resolve to the most recent membership.
+          if (count >= (tally.get(membership.organization_id as string) ?? 0)) membership = m;
+        }
+      }
       orgId = membership.organization_id as string;
       role = (membership.role as string) || "finance_user";
     } else if (isInviteAccept) {
