@@ -227,21 +227,32 @@ function median(values: number[]): number {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-// Structural (allocation-level) anomalies need no spend history: a line whose
-// budget cannot cover its committed future spend + reserve, or an outsized
-// allocation paired with low strategic priority.
+// Structural (allocation-level) anomalies need no spend history — they are
+// universal, deterministic checks that apply to any budget-lines CSV:
+//  1. underfunded        remaining < committed future spend + reserve
+//  2. allocation_outlier allocation > 6x the org median at low priority
+//  3. token_allocation   a near-zero allocation (placeholder value)
+//  4. priority_mismatch  median-level funding on a line with priority <= 30
 function structuralAnomalies(
   line: { allocated_amount: unknown; priority_weight: unknown; necessary_future_spend: unknown; safety_reserve: unknown },
   remaining: number,
   medianAllocation: number,
-): { type: "underfunded" | "allocation_outlier"; deficit?: number }[] {
-  const out: { type: "underfunded" | "allocation_outlier"; deficit?: number }[] = [];
+): { type: "underfunded" | "allocation_outlier" | "token_allocation" | "priority_mismatch"; deficit?: number }[] {
+  const out: { type: "underfunded" | "allocation_outlier" | "token_allocation" | "priority_mismatch"; deficit?: number }[] = [];
+  const allocated = num(line.allocated_amount);
+  const priority = Number(line.priority_weight);
   const commitments = num(line.necessary_future_spend) + num(line.safety_reserve);
   if (remaining < commitments) {
     out.push({ type: "underfunded", deficit: money(commitments - remaining) });
   }
-  if (medianAllocation > 0 && num(line.allocated_amount) > 6 * medianAllocation && Number(line.priority_weight) < 60) {
+  if (medianAllocation > 0 && allocated > 6 * medianAllocation && priority < 60) {
     out.push({ type: "allocation_outlier" });
+  }
+  if (allocated > 0 && allocated < 100) {
+    out.push({ type: "token_allocation" });
+  }
+  if (medianAllocation > 0 && priority <= 30 && allocated >= medianAllocation * 0.8) {
+    out.push({ type: "priority_mismatch" });
   }
   return out;
 }

@@ -37,10 +37,19 @@ function SeverityBadge({ multiplier }: { multiplier: number }) {
   return <span className="px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-code-sm font-bold">Moderate {multiplier.toFixed(1)}×</span>;
 }
 
+const STRUCTURAL_LABELS: Record<string, string> = {
+  underfunded: "Underfunded",
+  allocation_outlier: "Allocation Outlier",
+  token_allocation: "Token Allocation",
+  priority_mismatch: "Priority Mismatch",
+};
+
 function StructuralBadge({ type }: { type: string }) {
-  if (type === "underfunded")
-    return <span className="px-2 py-0.5 rounded bg-error-container text-error font-code-sm font-bold">Underfunded</span>;
-  return <span className="px-2 py-0.5 rounded bg-secondary-fixed text-secondary font-code-sm font-bold">Allocation Outlier</span>;
+  const label = STRUCTURAL_LABELS[type] ?? type.split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  const tone = type === "underfunded" || type === "token_allocation"
+    ? "bg-error-container text-error"
+    : "bg-secondary-fixed text-secondary";
+  return <span className={`px-2 py-0.5 rounded font-code-sm font-bold ${tone}`}>{label}</span>;
 }
 
 export default function SignalsPage() {
@@ -184,11 +193,15 @@ export default function SignalsPage() {
                     /* Structural metrics */
                     <div className="grid grid-cols-2 gap-space-md">
                       <div className="bg-surface-container p-space-sm rounded-lg border border-outline-variant text-center">
-                        <div className="font-label-caps text-label-caps uppercase text-outline mb-1">Funding Shortfall</div>
-                        <div className="font-numeric-table text-on-surface font-semibold">{formatINR(sig.deficit ?? 0)}</div>
+                        <div className="font-label-caps text-label-caps uppercase text-outline mb-1">
+                          {sig.anomaly_type === "underfunded" ? "Funding Shortfall" : "Allocated"}
+                        </div>
+                        <div className="font-numeric-table text-on-surface font-semibold">
+                          {formatINR(sig.anomaly_type === "underfunded" ? (sig.deficit ?? 0) : (sig.remaining_budget ?? 0))}
+                        </div>
                       </div>
                       <div className="bg-surface-container p-space-sm rounded-lg border border-outline-variant text-center">
-                        <div className="font-label-caps text-label-caps uppercase text-outline mb-1">Commitments vs Remaining</div>
+                        <div className="font-label-caps text-label-caps uppercase text-outline mb-1">Remaining Budget</div>
                         <div className="font-numeric-table text-on-surface font-semibold">
                           {formatINR(sig.remaining_budget ?? 0)} <span className="text-outline font-normal">left</span>
                         </div>
