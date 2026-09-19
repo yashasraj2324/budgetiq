@@ -27,7 +27,8 @@ const empty: Form = {
   policy_maximum_transfer: "0",
 };
 
-const REQUIRED_COLUMNS = ["department_id", "name", "allocated_amount", "priority_weight", "category"];
+const REQUIRED_COLUMNS = ["name", "allocated_amount", "priority_weight", "category"];
+const DISPLAY_COLUMNS = ["department", "name", "allocated_amount", "priority_weight", "category"];
 
 type CsvRow = Record<string, string>;
 type PreviewRow = { row: number; values: CsvRow; error?: string };
@@ -70,8 +71,11 @@ function parseCsv(text: string): CsvRow[] {
 }
 
 function validateRow(row: CsvRow, rowNumber: number, departments: Department[], seen: Set<string>): string | undefined {
-  const departmentId = Number(row.department_id);
-  if (!Number.isInteger(departmentId) || !departments.some((d) => d.id === departmentId)) return `department ${row.department_id || "(empty)"} not found`;
+  const deptName = String(row.department_name ?? "").trim();
+  const deptId = Number(row.department_id);
+  if (!deptName && (!Number.isInteger(deptId) || !departments.some((d) => d.id === deptId))) {
+    return `department ${row.department_id || "(empty)"} not found — use a department_name column to auto-create departments`;
+  }
   const name = String(row.name ?? "").trim();
   if (!name) return "name is required";
   const allocated = Number(row.allocated_amount);
@@ -80,7 +84,7 @@ function validateRow(row: CsvRow, rowNumber: number, departments: Department[], 
   if (!Number.isInteger(priority) || priority < 0 || priority > 100) return "priority_weight must be between 0 and 100";
   const category = String(row.category ?? "").trim();
   if (!category) return "category is required";
-  const key = `${departmentId}|${name}`;
+  const key = `${deptName || deptId}|${name}`;
   if (seen.has(key)) return "duplicate budget line";
   seen.add(key);
   return undefined;
@@ -106,6 +110,8 @@ export default function DataPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deptName, setDeptName] = useState("");
+  const [deptSaving, setDeptSaving] = useState(false);
 
   useEffect(() => {
     apiFetch(`${API}/departments`)
@@ -176,6 +182,7 @@ export default function DataPage() {
         return;
       }
       const missing = REQUIRED_COLUMNS.filter((col) => !(col in rows[0]));
+      if (!("department_id" in rows[0]) && !("department_name" in rows[0])) missing.push("department_id or department_name");
       setMissingColumns(missing);
       setPreview(previewRows(rows, departments, missing));
     }).catch(() => setError("Could not read the selected file."));
@@ -214,6 +221,29 @@ export default function DataPage() {
 
   const invalidCount = preview?.filter((p) => p.error).length ?? 0;
 
+  async function addDepartment(event: FormEvent) {
+    event.preventDefault();
+    const name = deptName.trim();
+    if (!name) { setError("Department name is required."); return; }
+    setDeptSaving(true); setError(""); setMessage("");
+    try {
+      const response = await apiFetch(`${API}/departments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!response.ok) throw new Error(await apiError(response, "Could not add department"));
+      const created = await response.json();
+      setDepartments((current) => [...current, { id: created.id, name: created.name }]);
+      setDeptName("");
+      setMessage(`Department "${created.name}" added.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not add department");
+    } finally {
+      setDeptSaving(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-background px-4 py-12 text-on-surface font-body-md">
       <div className="mx-auto max-w-4xl">
@@ -229,7 +259,7 @@ export default function DataPage() {
             <div>
               <h2 className="font-headline-md text-headline-md">Import CSV</h2>
               <p className="mt-1 text-sm text-on-surface-variant">
-                Columns: {REQUIRED_COLUMNS.join(", ")}, then optional necessary_future_spend, safety_reserve, policy_maximum_transfer.
+                Columns: department_name (auto-created if new) or department_id, name, allocated_amount, priority_weight, category — then optional necessary_future_spend, safety_reserve, policy_maximum_transfer.
               </p>
             </div>
             <button
@@ -276,7 +306,7 @@ export default function DataPage() {
                   <thead>
                     <tr className="bg-surface-container-low text-outline">
                       <th className="py-2 px-3 font-label-caps text-label-caps uppercase tracking-wider">Row</th>
-                      {REQUIRED_COLUMNS.map((col) => (
+                      {DISPLAY_COLUMNS.map((col) => (
                         <th key={col} className="py-2 px-3 font-label-caps text-label-caps uppercase tracking-wider">{col}</th>
                       ))}
                       <th className="py-2 px-3 font-label-caps text-label-caps uppercase tracking-wider">Status</th>
@@ -286,8 +316,10 @@ export default function DataPage() {
                     {preview.slice(0, 10).map((p) => (
                       <tr key={p.row} className={p.error ? "bg-error-container/10" : ""}>
                         <td className="py-2 px-3 font-numeric-table">{p.row}</td>
-                        {REQUIRED_COLUMNS.map((col) => (
-                          <td key={col} className="py-2 px-3 font-numeric-table max-w-[140px] truncate">{p.values[col]}</td>
+                        {DISPLAY_COLUMNS.map((col) => (
+                          <td key={col} className="py-2 px-3 font-numeric-table max-w-[140px] truncate">
+                            {col === "department" ? (p.values.department_name || p.values.department_id) : p.values[col]}
+                          </td>
                         ))}
                         <td className={`py-2 px-3 text-xs font-medium ${p.error ? "text-error" : "text-primary"}`}>
                           {p.error ?? "ok"}
@@ -316,7 +348,24 @@ export default function DataPage() {
         {/* Manual add */}
         <section className="mt-6 rounded-xl border border-outline-variant bg-surface-container-lowest p-6 shadow-sm">
           <h2 className="font-headline-md text-headline-md">Add budget line</h2>
-          {departments.length === 0 && <p className="mt-3 text-sm text-secondary">Create a department during workspace setup before adding lines.</p>}
+          {departments.length === 0 && <p className="mt-3 text-sm text-secondary">Add a department first — new departments can also be created automatically by importing a CSV with a department_name column.</p>}
+
+          {/* Quick department add */}
+          <form onSubmit={addDepartment} className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-outline-variant bg-surface-container p-space-md">
+            <label className="block text-sm font-medium">
+              New department
+              <input
+                value={deptName}
+                onChange={(event) => setDeptName(event.target.value)}
+                placeholder="e.g. Marketing"
+                className="mt-1 w-64 rounded border border-outline-variant bg-surface-container-lowest px-3 py-2 text-on-surface"
+              />
+            </label>
+            <button type="submit" disabled={deptSaving} className="rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-container-low transition-colors disabled:opacity-50">
+              {deptSaving ? "Adding…" : "Add department"}
+            </button>
+          </form>
+
           <form onSubmit={addLine} className="mt-5 grid gap-4 sm:grid-cols-2">
             {([
               ["department_id", "Department", "select"],

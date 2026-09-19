@@ -2,6 +2,7 @@
 
 import { Shell } from "@/components/Shell";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { API, apiError, apiFetch } from "@/lib/api";
 
 interface ScenarioFilters {
@@ -30,6 +31,7 @@ const emptyFilters: ScenarioFilters = {
 };
 
 export default function ScenariosPage() {
+  const navigate = useNavigate();
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -261,6 +263,20 @@ export default function ScenariosPage() {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            const params = new URLSearchParams();
+                            const filters = scenario.filters ?? {};
+                            if (filters.department_id) params.set("department_id", String(filters.department_id));
+                            if (filters.category) params.set("category", filters.category);
+                            if (filters.search) params.set("search", filters.search);
+                            navigate(`/dashboard${params.toString() ? `?${params.toString()}` : ""}`);
+                          }}
+                          className="text-primary hover:underline transition-colors font-medium"
+                          title="Open scenario on the dashboard"
+                        >
+                          Open
+                        </button>
                         <button
                           onClick={() => {
                             setEditingId(scenario.id);

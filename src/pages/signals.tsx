@@ -58,7 +58,7 @@ export default function SignalsPage() {
     line.remaining_budget - (line.necessary_future_spend ?? 0) - (line.safety_reserve ?? 0);
 
   const targetOptions = (sourceId: number) =>
-    lines.filter(l => l.id !== sourceId && l.priority_weight > (lines.find(x => x.id === sourceId)?.priority_weight ?? 0));
+    lines.filter(l => l.id !== sourceId && (l.allocated_amount - l.remaining_budget) > 0 && l.priority_weight > (lines.find(x => x.id === sourceId)?.priority_weight ?? 0));
 
   const handleResolve = async (sourceId: number) => {
     const targets = targetOptions(sourceId);

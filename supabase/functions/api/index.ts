@@ -231,7 +231,10 @@ function calculateTransfer(
   if (sourceSurplus <= 0) {
     return { transfer: 0, source_surplus: sourceSurplus, target_funding_gap: targetFundingGap, capped_by: "source_surplus" };
   }
-  const limits = { source_surplus: sourceSurplus, target_funding_gap: targetFundingGap, policy_maximum: policyMaximum };
+  // A policy_maximum of 0 means "not configured" (the schema default), so it is
+  // treated as uncapped — otherwise a fresh workspace could never generate.
+  const limits: Record<string, number> = { source_surplus: sourceSurplus, target_funding_gap: targetFundingGap };
+  if (policyMaximum > 0) limits.policy_maximum = policyMaximum;
   let cappedBy: string = "source_surplus";
   let min = Infinity;
   for (const [key, value] of Object.entries(limits)) {
@@ -243,7 +246,7 @@ function calculateTransfer(
 function validateCustomAmount(amount: number, sourceSurplus: number, targetFundingGap: number, policyMaximum: number): string | null {
   if (amount > sourceSurplus) return `Exceeds source surplus (₹${sourceSurplus.toLocaleString("en-IN", { maximumFractionDigits: 0 })})`;
   if (amount > targetFundingGap) return `Exceeds target funding gap (₹${targetFundingGap.toLocaleString("en-IN", { maximumFractionDigits: 0 })})`;
-  if (amount > policyMaximum) return `Exceeds policy maximum (₹${policyMaximum.toLocaleString("en-IN", { maximumFractionDigits: 0 })})`;
+  if (policyMaximum > 0 && amount > policyMaximum) return `Exceeds policy maximum (₹${policyMaximum.toLocaleString("en-IN", { maximumFractionDigits: 0 })})`;
   return null;
 }
 
@@ -644,11 +647,12 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
 
   // ---- CSV import template -------------------------------------------------
   if (first === "budget-lines" && seg.join("/") === "budget-lines/import/template" && method === "GET") {
-    const { data: depts } = await supabase.from("departments").select("id").eq("organization_id", org_id).order("id", { ascending: true }).limit(1);
-    const exampleId = depts?.[0]?.id ?? 1;
+    // The template uses department_name: fresh workspaces have no departments
+    // yet, and the importer auto-creates departments named in the CSV.
     const template = [
-      "department_id,name,allocated_amount,priority_weight,category,necessary_future_spend,safety_reserve,policy_maximum_transfer",
-      `${exampleId},Example Budget Line,1000000,50,General,200000,50000,300000`,
+      "department_name,name,allocated_amount,priority_weight,category,necessary_future_spend,safety_reserve,policy_maximum_transfer",
+      "Marketing,Regional Events,5000000,35,Events,800000,100000,1000000",
+      "Product,Customer Onboarding,1200000,92,Automation,300000,50000,400000",
     ].join("\n");
     return new Response(template, {
       status: 200,
@@ -668,19 +672,41 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     const raw = await file.text();
     const rows = parseCsv(raw);
     if (!rows.length) throw new HttpError(422, "CSV file is empty");
-    const required = ["department_id", "name", "allocated_amount", "priority_weight", "category"];
+    // department_id (must exist) OR department_name (auto-created) is accepted.
+    const required = ["name", "allocated_amount", "priority_weight", "category"];
     for (const col of required) if (!(col in rows[0])) throw new HttpError(422, `CSV must include columns: ${[...required].sort().join(", ")}`);
-    const { data: depts } = await supabase.from("departments").select("id").eq("organization_id", org_id);
+    if (!("department_id" in rows[0]) && !("department_name" in rows[0])) {
+      throw new HttpError(422, "CSV must include a department_id or department_name column");
+    }
+    const { data: depts } = await supabase.from("departments").select("id, name").eq("organization_id", org_id);
     const deptIds = new Set((depts ?? []).map((d) => Number(d.id)));
+    const deptByName = new Map<string, number>((depts ?? []).map((d) => [String(d.name).trim().toLowerCase(), Number(d.id)]));
     const { data: existing } = await supabase.from("budget_lines").select("department_id, name").eq("organization_id", org_id);
     const seen = new Set((existing ?? []).map((l) => `${Number(l.department_id)}|${l.name}`));
     const errors: { row: number; error: string }[] = [];
     const pending: Record<string, unknown>[] = [];
-    rows.forEach((row, idx) => {
+    // Pass 1 — validate every row with no side effects. Collect department
+    // names that would need to be auto-created.
+    const newDeptNames: string[] = [];
+    for (const [idx, row] of rows.entries()) {
       const rowNumber = idx + 2;
       try {
-        const departmentId = Number(row.department_id);
-        if (!Number.isInteger(departmentId) || !deptIds.has(departmentId)) throw new Error(`department ${row.department_id} not found`);
+        const byName = String(row.department_name ?? "").trim();
+        const byId = Number(row.department_id);
+        let departmentId: number | null = null;
+        if (byName) {
+          const existingId = deptByName.get(byName.toLowerCase());
+          if (existingId) {
+            departmentId = existingId;
+          } else {
+            if (!newDeptNames.some((n) => n.toLowerCase() === byName.toLowerCase())) newDeptNames.push(byName);
+          }
+        } else if (Number.isInteger(byId) && deptIds.has(byId)) {
+          departmentId = byId;
+        }
+        if (departmentId === null && !byName) {
+          throw new Error(`department ${row.department_id || "(empty)"} not found — use a department_name column to auto-create departments`);
+        }
         const name = String(row.name ?? "").trim();
         if (!name) throw new Error("name is required");
         const allocated = Number(row.allocated_amount);
@@ -689,29 +715,47 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
         if (!Number.isInteger(priority) || priority < 0 || priority > 100) throw new Error("priority_weight must be between 0 and 100");
         const category = String(row.category ?? "").trim();
         if (!category) throw new Error("category is required");
-        const key = `${departmentId}|${name}`;
+        const key = `${byName.toLowerCase() || byId}|${name}`;
         if (seen.has(key)) throw new Error("duplicate budget line");
         seen.add(key);
-        pending.push({
-          organization_id: org_id,
-          department_id: departmentId,
-          name,
-          allocated_amount: money(allocated),
-          priority_weight: priority,
-          category,
-          necessary_future_spend: money(Number(row.necessary_future_spend) || 0),
-          safety_reserve: money(Number(row.safety_reserve) || 0),
-          policy_maximum_transfer: money(Number(row.policy_maximum_transfer) || 0),
-        });
+        pending.push({ rowNumber, byName, byId, departmentId, name, allocated, priority, category, row });
       } catch (e) {
         errors.push({ row: rowNumber, error: e instanceof Error ? e.message : String(e) });
       }
-    });
+    }
     if (errors.length) throw new HttpError(422, JSON.stringify({ errors }));
-    const { error } = await supabase.from("budget_lines").insert(pending);
+    // Create any new departments now that validation passed.
+    const createdDepts: string[] = [];
+    for (const name of newDeptNames) {
+      const { data: created, error } = await supabase.from("departments").insert({
+        organization_id: org_id,
+        name,
+        priority_weight: 50,
+      }).select("id").single();
+      if (error) throw new HttpError(500, `Unable to create department ${name}: ${error.message}`);
+      deptByName.set(name.toLowerCase(), Number(created.id));
+      createdDepts.push(name);
+    }
+    // Pass 2 — resolve department ids and build the insert rows.
+    const linesToInsert = pending.map((item) => {
+      const row = item.row as Record<string, string>;
+      const departmentId = (item.departmentId as number | null) ?? deptByName.get(String(item.byName).toLowerCase())!;
+      return {
+        organization_id: org_id,
+        department_id: departmentId,
+        name: String(item.name),
+        allocated_amount: money(item.allocated as number),
+        priority_weight: Number(item.priority),
+        category: String(item.category),
+        necessary_future_spend: money(Number(row.necessary_future_spend) || 0),
+        safety_reserve: money(Number(row.safety_reserve) || 0),
+        policy_maximum_transfer: money(Number(row.policy_maximum_transfer) || 0),
+      };
+    });
+    const { error } = await supabase.from("budget_lines").insert(linesToInsert);
     if (error) throw new HttpError(500, `Import failed: ${error.message}`);
-    await logAudit(supabase, ctx, "budget_line_import", { created: pending.length, errors: 0 });
-    return json({ ok: true, created: pending.length, errors: [] });
+    await logAudit(supabase, ctx, "budget_line_import", { created: linesToInsert.length, departments_created: createdDepts, errors: 0 });
+    return json({ ok: true, created: linesToInsert.length, departments_created: createdDepts, errors: [] });
   }
 
   if (first === "budget-lines" && seg.length === 2 && method === "POST") {
@@ -840,6 +884,8 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
 
   // Bulk spend import — the monthly budget-refresh surface. Upserts on
   // (budget_line_id, period) so re-importing a period replaces its value.
+  // Accepts budget_line_id OR budget_line_name (optionally with department_name
+  // to disambiguate), so a fresh workspace can map spend straight from names.
   if (first === "spend" && seg[1] === "import" && method === "POST") {
     if (!isAdmin) throw new HttpError(403, "Organization administrator role required");
     const form = await req.formData();
@@ -847,18 +893,50 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     if (!(file instanceof File)) throw new HttpError(422, "CSV file required");
     const rows = parseCsv(await file.text());
     if (!rows.length) throw new HttpError(422, "CSV file is empty");
-    const required = ["budget_line_id", "period", "amount_spent"];
-    for (const col of required) if (!(col in rows[0])) throw new HttpError(422, `CSV must include columns: ${required.join(", ")}`);
-    const { data: lines } = await supabase.from("budget_lines").select("id").eq("organization_id", org_id);
+    for (const col of ["period", "amount_spent"]) if (!(col in rows[0])) throw new HttpError(422, `CSV must include columns: ${["period", "amount_spent"].join(", ")}`);
+    if (!("budget_line_id" in rows[0]) && !("budget_line_name" in rows[0])) {
+      throw new HttpError(422, "CSV must include a budget_line_id or budget_line_name column");
+    }
+    const { data: lines } = await supabase.from("budget_lines").select("id, name, department_id").eq("organization_id", org_id);
     const lineIds = new Set((lines ?? []).map((l) => Number(l.id)));
+    const byName = new Map<string, number[]>();
+    for (const l of lines ?? []) {
+      const key = String(l.name).trim().toLowerCase();
+      byName.set(key, [...(byName.get(key) ?? []), Number(l.id)]);
+    }
+    const { data: depts } = await supabase.from("departments").select("id, name").eq("organization_id", org_id);
+    const deptLineIds = new Map<string, number>();
+    for (const l of lines ?? []) {
+      const deptName = (depts ?? []).find((d) => Number(d.id) === Number(l.department_id))?.name;
+      if (!deptName) continue;
+      deptLineIds.set(`${deptName.trim().toLowerCase()}|${String(l.name).trim().toLowerCase()}`, Number(l.id));
+    }
     const errors: { row: number; error: string }[] = [];
     const upserts: { id: number | null; insert: { organization_id: string; budget_line_id: number; period: string; amount_spent: number } }[] = [];
     const seen = new Set<string>();
     for (const [idx, row] of rows.entries()) {
       const rowNumber = idx + 2;
       try {
-        const lineId = Number(row.budget_line_id);
-        if (!Number.isInteger(lineId) || !lineIds.has(lineId)) throw new Error(`budget_line ${row.budget_line_id} not found`);
+        let lineId: number | null = null;
+        if (row.budget_line_id !== undefined && String(row.budget_line_id).trim() !== "") {
+          const id = Number(row.budget_line_id);
+          if (!Number.isInteger(id) || !lineIds.has(id)) throw new Error(`budget_line ${row.budget_line_id} not found`);
+          lineId = id;
+        } else {
+          const name = String(row.budget_line_name ?? "").trim();
+          if (!name) throw new Error("budget_line_id or budget_line_name is required");
+          const deptName = String(row.department_name ?? "").trim();
+          if (deptName) {
+            const resolved = deptLineIds.get(`${deptName.toLowerCase()}|${name.toLowerCase()}`);
+            if (!resolved) throw new Error(`budget line "${name}" not found in department "${deptName}"`);
+            lineId = resolved;
+          } else {
+            const candidates = byName.get(name.toLowerCase()) ?? [];
+            if (candidates.length === 0) throw new Error(`budget line "${name}" not found`);
+            if (candidates.length > 1) throw new Error(`budget line "${name}" is ambiguous — include a department_name column`);
+            lineId = candidates[0];
+          }
+        }
         const period = String(row.period ?? "").trim();
         if (!period) throw new Error("period is required");
         const amount = Number(row.amount_spent);
@@ -913,6 +991,25 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
   }
 
   // ---- Departments / performance scores -----------------------------------
+  if (first === "departments" && method === "POST") {
+    if (!isAdmin) throw new HttpError(403, "Organization administrator role required");
+    const body = await req.json();
+    const name = String(body.name ?? "").trim();
+    if (!name) throw new HttpError(422, "Department name is required");
+    const { data: dup } = await supabase.from("departments").select("id").eq("organization_id", org_id).eq("name", name).maybeSingle();
+    if (dup) throw new HttpError(409, "Department already exists");
+    const priority = Number(body.priority_weight);
+    if (!Number.isInteger(priority) || priority < 0 || priority > 100) throw new HttpError(422, "priority_weight must be between 0 and 100");
+    const { data: created, error } = await supabase.from("departments").insert({
+      organization_id: org_id,
+      name,
+      priority_weight: priority || 50,
+    }).select("id, name, priority_weight").single();
+    if (error) throw new HttpError(500, `Create failed: ${error.message}`);
+    await logAudit(supabase, ctx, "department_create", { department_id: Number(created.id), name: created.name });
+    return json({ id: Number(created.id), name: created.name, priority_weight: Number(created.priority_weight) }, 201);
+  }
+
   if (first === "departments" && method === "GET") {
     const { data: depts } = await supabase.from("departments").select("*").eq("organization_id", org_id).order("id", { ascending: true });
     const { data: allLines } = await supabase.from("budget_lines").select("*").eq("organization_id", org_id);
@@ -1162,6 +1259,18 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
       fiscal_year: String(body.fiscal_year ?? orgRow?.fiscal_year ?? "FY25"),
       currency: String(body.currency ?? orgRow?.currency ?? "INR").trim().toUpperCase().slice(0, 3),
     }).eq("id", org_id);
+    // Persist the workspace profile (industry / company size / planning period)
+    // so the onboarding form is truthful, not decorative.
+    const profile = {
+      industry: body.industry ? String(body.industry) : undefined,
+      company_size: body.company_size ? String(body.company_size) : undefined,
+      planning_period: body.planning_period ? String(body.planning_period) : undefined,
+    };
+    if (profile.industry || profile.company_size || profile.planning_period) {
+      const { data: existingOb } = await supabase.from("onboarding_configs").select("metadata").eq("organization_id", org_id).maybeSingle();
+      const mergedMetadata = { ...(existingOb?.metadata ?? {}), ...Object.fromEntries(Object.entries(profile).filter(([, v]) => v !== undefined)) };
+      await supabase.from("onboarding_configs").upsert({ organization_id: org_id, metadata: mergedMetadata }, { onConflict: "organization_id" });
+    }
     const created = { departments: 0, budget_lines: 0 };
     const { data: depts } = await supabase.from("departments").select("id, name").eq("organization_id", org_id);
     const existingDept = new Map((depts ?? []).map((d) => [String(d.name), Number(d.id)]));

@@ -22,9 +22,12 @@ export default function OnboardingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          org_name: fd.get("org_name") || "My Organization",
+          org_name: fd.get("company_name") || "My Organization",
           fiscal_year: fd.get("financial_year") || "FY 2025",
           currency: fd.get("base_currency") || "INR",
+          industry: fd.get("industry") || "",
+          company_size: fd.get("company_size") || "",
+          planning_period: fd.get("planning_period") || "Q3",
           departments: [],
           budget_lines: []
         })

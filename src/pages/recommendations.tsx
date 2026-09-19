@@ -208,7 +208,7 @@ export default function RecommendationsPage() {
                 className="rounded-lg border border-outline-variant bg-surface-container px-space-md py-2.5 font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="">— Select target —</option>
-                {lines.filter(l => l.id !== parseInt(sourceId || "0")).map(l => (
+                {lines.filter(l => l.id !== parseInt(sourceId || "0") && (l.allocated_amount - l.remaining_budget) > 0).map(l => (
                   <option key={l.id} value={l.id}>
                     {l.name} · remaining {formatINR(l.remaining_budget)} · priority {l.priority_weight}
                   </option>

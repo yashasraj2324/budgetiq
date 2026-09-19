@@ -196,9 +196,9 @@ export default function DashboardPage() {
               <span className="material-symbols-outlined text-[16px]">calendar_today</span>
               <span className="font-code-sm text-code-sm text-on-surface">{fiscalYear} &middot; {periodLabel}</span>
             </div>
-            <Link to="/dashboard?category=scenario" className="flex items-center gap-space-xs px-space-md py-1 bg-surface-container-lowest text-outline font-body-sm text-body-sm rounded shadow-sm transition-colors duration-150">
+            <Link to="/scenarios" className="flex items-center gap-space-xs px-space-md py-1 bg-surface-container-lowest text-outline font-body-sm text-body-sm rounded shadow-sm transition-colors duration-150">
               <span className="material-symbols-outlined text-[16px] text-outline">tune</span>
-              <span>Filter Scenarios</span>
+              <span>Saved Scenarios</span>
             </Link>
             <form
               onSubmit={(event) => { event.preventDefault(); applySearch(); }}

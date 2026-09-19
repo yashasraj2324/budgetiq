@@ -116,8 +116,8 @@ export default function ImportPage() {
             </p>
           </div>
           <p className="text-xs font-mono text-outline">
-            Columns: department_id, name, allocated_amount, priority_weight, category, necessary_future_spend,
-            safety_reserve, policy_maximum_transfer
+            Columns: department_name (auto-created if new) or department_id, name, allocated_amount, priority_weight,
+            category, necessary_future_spend, safety_reserve, policy_maximum_transfer
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-container-low transition-colors">
@@ -163,7 +163,10 @@ export default function ImportPage() {
               monthly budget refresh.
             </p>
           </div>
-          <p className="text-xs font-mono text-outline">Columns: budget_line_id, period, amount_spent</p>
+          <p className="text-xs font-mono text-outline">
+            Columns: budget_line_id, period, amount_spent — or budget_line_name (with optional department_name to
+            disambiguate), period, amount_spent. Re-importing a period replaces its value.
+          </p>
           <div className="flex flex-wrap items-center gap-3">
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-container-low transition-colors">
               <span className="material-symbols-outlined text-[18px] text-outline">upload_file</span>
