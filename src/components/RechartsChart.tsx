@@ -86,7 +86,7 @@ export function RechartsChart() {
   }, []);
 
   return (
-    <div className="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col justify-between">
+    <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between">
       <div className="flex items-center justify-between mb-space-sm">
         <span className="font-headline-md text-headline-md text-on-surface">{title}</span>
         <span className="font-code-sm text-code-sm text-outline">Projected Periods</span>
@@ -96,6 +96,12 @@ export function RechartsChart() {
         {data.length ? (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data}>
+              <defs>
+                <linearGradient id="spendGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgba(37, 99, 235, 0.55)" />
+                  <stop offset="100%" stopColor="rgba(37, 99, 235, 0.12)" />
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(195, 198, 215, 0.5)" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#626570" }} tickLine={false} axisLine={false} />
               <YAxis hide />
@@ -105,11 +111,11 @@ export function RechartsChart() {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 formatter={((value: any) => [formatMoney(Number(value), currency), "Spend"]) as any}
               />
-              <Bar dataKey="spend" radius={[4, 4, 0, 0]}>
+              <Bar dataKey="spend" radius={[6, 6, 0, 0]}>
                 {data.map((entry, index) => (
                   <Cell
                     key={`cell-${index}`}
-                    fill={entry.anomaly ? "rgba(255, 183, 125, 1)" : entry.projected ? "rgba(37, 99, 235, 0.35)" : "rgba(220, 233, 255, 1)"}
+                    fill={entry.anomaly ? "rgba(255, 183, 125, 1)" : "url(#spendGrad)"}
                   />
                 ))}
               </Bar>

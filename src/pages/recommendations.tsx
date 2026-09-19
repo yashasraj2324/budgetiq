@@ -158,7 +158,7 @@ export default function RecommendationsPage() {
       {/* Generate modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-surface-container-lowest rounded-2xl shadow-2xl border border-outline-variant w-full max-w-lg mx-4 p-space-xl flex flex-col gap-space-md">
+          <div className="bg-surface-container-lowest rounded-2xl shadow-2xl border border-outline-variant w-full max-w-lg mx-4 p-space-xl flex flex-col gap-space-md animate-[modal-in_0.18s_ease-out]">
             <div className="flex justify-between items-start">
               <div>
                 <h2 className="font-headline-md text-headline-md text-on-surface">Generate Recommendation</h2>
@@ -228,7 +228,7 @@ export default function RecommendationsPage() {
                 id="btn-confirm-generate"
                 onClick={handleGenerate}
                 disabled={generating}
-                className="flex-1 py-2.5 bg-primary text-on-primary rounded-lg shadow hover:bg-primary/90 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-space-xs"
+                className="flex-1 py-2.5 bg-primary text-on-primary rounded-lg shadow hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 font-medium disabled:opacity-50 flex items-center justify-center gap-space-xs"
               >
                 {generating ? (
                   <>

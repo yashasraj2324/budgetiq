@@ -405,7 +405,7 @@ export default function SettingsPage() {
                 </label>
               </div>
               <div className="flex justify-end">
-                <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Save organization</button>
+                <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:shadow-md active:scale-[0.98] transition-all duration-150">Save organization</button>
               </div>
             </form>
 
@@ -460,7 +460,7 @@ export default function SettingsPage() {
                 </label>
               </div>
               <div className="flex justify-end">
-                <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Save fiscal calendar</button>
+                <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:shadow-md active:scale-[0.98] transition-all duration-150">Save fiscal calendar</button>
               </div>
             </form>
 
@@ -482,7 +482,7 @@ export default function SettingsPage() {
                   <input type="number" min={1} max={90} value={inviteDays} onChange={(event) => setInviteDays(Number(event.target.value || 7))} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 bg-surface" />
                 </label>
                 <div className="md:col-span-4 flex justify-end">
-                  <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Invite member</button>
+                  <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:shadow-md active:scale-[0.98] transition-all duration-150">Invite member</button>
                 </div>
               </form>
 
@@ -571,7 +571,7 @@ export default function SettingsPage() {
                   </select>
                 </label>
                 <div className="md:col-span-4 flex justify-end">
-                  <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Create API key</button>
+                  <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:shadow-md active:scale-[0.98] transition-all duration-150">Create API key</button>
                 </div>
               </form>
 

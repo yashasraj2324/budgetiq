@@ -59,7 +59,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-space-lg">
+    <div className="min-h-screen flex items-center justify-center bg-background p-space-lg bg-[radial-gradient(1200px_600px_at_20%_10%,rgba(0,74,198,0.08),transparent),radial-gradient(1000px_500px_at_80%_90%,rgba(26,127,55,0.06),transparent)]">
       <div className="w-full max-w-md bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-space-xl">
 
         {/* Brand Header */}
@@ -72,6 +72,9 @@ export default function SignupPage() {
           <h1 className="font-headline-md text-headline-md text-on-surface">Create your account</h1>
           <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
             Set up your Ledger Workspace
+          </p>
+          <p className="font-body-sm text-body-sm text-on-surface-variant mt-2">
+            Detect · Calculate · Explain · Approve — AI explains, the engine decides, humans approve.
           </p>
         </div>
 
@@ -127,7 +130,7 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full h-10 bg-primary-container hover:bg-primary active:bg-on-primary-fixed-variant text-on-primary font-body-md text-body-md font-semibold rounded shadow-sm transition-colors duration-150 flex items-center justify-center gap-space-xs mt-space-md cursor-pointer disabled:opacity-50"
+            className="w-full h-10 bg-primary-container hover:bg-primary active:bg-on-primary-fixed-variant active:scale-[0.98] text-on-primary font-body-md text-body-md font-semibold rounded shadow-sm hover:shadow-md transition-all duration-150 flex items-center justify-center gap-space-xs mt-space-md cursor-pointer disabled:opacity-50"
           >
             <span>{submitting ? "Creating account…" : "Create Account"}</span>
             <span className="material-symbols-outlined text-[18px]">how_to_reg</span>

@@ -11,10 +11,29 @@ interface Recommendation {
   amount: number;
   status: string;
   confidence: number;
+  source_line_id: number;
+  target_line_id: number;
   created_at?: string | null;
   escalation?: { overdue?: boolean; hours_overdue?: number; escalate_to?: string } | null;
   rationale_json: { recommendation?: string; reasoning_steps?: { step: number; label: string; detail: string }[]; rejection_consequence?: string };
 }
+
+interface BudgetLine {
+  id: number;
+  name: string;
+  priority_weight: number;
+  remaining_budget: number;
+  necessary_future_spend: number;
+  safety_reserve: number;
+  policy_maximum_transfer: number;
+}
+
+const statusPill: Record<string, string> = {
+  pending: "bg-surface-container-high text-on-surface",
+  approved: "bg-success-container text-success",
+  rejected: "bg-error-container text-error",
+  modified: "bg-secondary-fixed text-secondary",
+};
 
 export default function RecommendationDetailPage() {
   const params = useParams();
@@ -22,6 +41,7 @@ export default function RecommendationDetailPage() {
   const { currency } = useOrgCurrency();
   const formatINR = (val: number) => formatMoney(val, currency);
   const [rec, setRec] = useState<Recommendation | null>(null);
+  const [lines, setLines] = useState<BudgetLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
@@ -32,9 +52,14 @@ export default function RecommendationDetailPage() {
   const [modifyError, setModifyError] = useState("");
 
   useEffect(() => {
-    apiFetch(`${API}/recommendations/${params.id}`)
-      .then(r => r.json())
-      .then(d => { setRec(d); setLoading(false); });
+    Promise.all([
+      apiFetch(`${API}/recommendations/${params.id}`).then((r) => r.json()),
+      apiFetch(`${API}/budget-lines`).then((r) => r.json()).catch(() => []),
+    ]).then(([d, lineData]) => {
+      setRec(d as Recommendation);
+      setLines((lineData as BudgetLine[]) ?? []);
+      setLoading(false);
+    });
   }, [params.id]);
 
   const handleAction = async (action: "approve" | "reject") => {
@@ -92,6 +117,10 @@ export default function RecommendationDetailPage() {
   const steps: { step: number; label: string; detail: string }[] =
     rec.rationale_json?.reasoning_steps ?? [];
   const rejectionConsequence = rec.rationale_json?.rejection_consequence ?? "";
+  const source = lines.find((l) => l.id === rec.source_line_id);
+  const target = lines.find((l) => l.id === rec.target_line_id);
+  const sourceSurplus = source ? source.remaining_budget - source.necessary_future_spend - source.safety_reserve : null;
+  const policyCap = source && source.policy_maximum_transfer > 0 ? source.policy_maximum_transfer : null;
 
   return (
     <Shell activePath="recommendations">
@@ -109,12 +138,49 @@ export default function RecommendationDetailPage() {
                 Status: <span className="font-semibold capitalize">{rec.status}</span>
               </p>
             </div>
-            <div className="text-right">
-              <span className="font-numeric-metric-lg text-numeric-metric-lg text-primary font-bold">
-                {formatINR(rec.amount)}
-              </span>
-              <div className="font-code-sm text-code-sm text-outline mt-1">
-                Confidence: {Math.round(rec.confidence * 100)}%
+          </div>
+
+          {/* Hero: flow chips + guarded transfer amount */}
+          <div className="flex flex-col gap-space-md mb-space-md bg-surface-container-low rounded-xl border border-outline-variant p-space-lg">
+            <div className="flex items-center gap-space-md flex-wrap">
+              <div className="flex-1 min-w-[180px] bg-surface-container-lowest rounded-lg border border-outline-variant px-space-md py-2">
+                <div className="font-label-caps text-label-caps uppercase text-outline">Source</div>
+                <div className="font-body-md text-on-surface font-semibold">{source?.name ?? `Line #${rec.source_line_id}`}</div>
+                {source && (
+                  <div className="font-code-sm text-code-sm text-on-surface-variant">
+                    priority {source.priority_weight} · surplus {formatINR(Math.max(0, sourceSurplus ?? 0))}
+                  </div>
+                )}
+              </div>
+              <span className="material-symbols-outlined text-outline" aria-hidden="true">arrow_forward</span>
+              <div className="flex-1 min-w-[180px] bg-success-container rounded-lg px-space-md py-2">
+                <div className="font-label-caps text-label-caps uppercase text-on-success-container">Target</div>
+                <div className="font-body-md text-on-success-container font-semibold">{target?.name ?? `Line #${rec.target_line_id}`}</div>
+                {target && <div className="font-code-sm text-code-sm text-on-success-container">priority {target.priority_weight}</div>}
+              </div>
+            </div>
+            <div className="flex items-end justify-between gap-space-md flex-wrap">
+              <div>
+                <div className="font-label-caps text-label-caps uppercase text-outline">Transfer Amount</div>
+                <div className="font-numeric-metric-lg text-numeric-metric-lg text-on-surface font-bold text-3xl tracking-tight">
+                  {formatINR(rec.amount)}
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex gap-2">
+                  <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface font-code-sm text-code-sm font-semibold">
+                    Confidence {Math.round(rec.confidence * 100)}%
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full capitalize font-code-sm text-code-sm font-semibold ${statusPill[rec.status] ?? "bg-surface-container text-on-surface"}`}>
+                    {rec.status}
+                  </span>
+                </div>
+                {sourceSurplus !== null && (
+                  <div className="font-code-sm text-code-sm text-outline">
+                    From source surplus {formatINR(Math.max(0, sourceSurplus))}
+                    {policyCap ? ` · capped by policy ${formatINR(policyCap)}` : " · no policy cap"}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -186,7 +252,7 @@ export default function RecommendationDetailPage() {
                     id="btn-approve"
                     onClick={() => handleAction("approve")}
                     disabled={actionLoading}
-                    className="flex-1 py-2.5 bg-primary text-on-primary rounded-lg shadow hover:bg-primary/90 transition-colors font-medium disabled:opacity-50"
+                    className="flex-1 py-2.5 bg-primary text-on-primary rounded-lg shadow hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 font-medium disabled:opacity-50"
                   >
                     {actionLoading ? "Processing…" : "Approve"}
                   </button>
@@ -235,7 +301,7 @@ export default function RecommendationDetailPage() {
                       id="btn-confirm-modify"
                       onClick={handleModify}
                       disabled={actionLoading}
-                      className="flex-1 py-2.5 bg-primary text-on-primary rounded-lg shadow hover:bg-primary/90 transition-colors font-medium disabled:opacity-50"
+                      className="flex-1 py-2.5 bg-primary text-on-primary rounded-lg shadow hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 font-medium disabled:opacity-50"
                     >
                       {actionLoading ? "Processing…" : "Confirm Modification"}
                     </button>

@@ -250,7 +250,7 @@ export function ApprovalsTable({ initialData = [] }: { initialData?: Recommendat
                         <button
                           onClick={() => handleAction(rec.id, "approve")}
                           disabled={isLoading}
-                          className="px-3 py-1 bg-primary text-on-primary font-body-sm font-medium rounded-lg shadow-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
+                          className="px-3 py-1 bg-primary text-on-primary font-body-sm font-medium rounded-lg shadow-sm hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 disabled:opacity-50"
                         >
                           Approve
                         </button>

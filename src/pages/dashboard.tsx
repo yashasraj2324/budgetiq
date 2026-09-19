@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import { RechartsChart } from "@/components/RechartsChart";
 import { Shell } from "@/components/Shell";
 import { API, apiError, apiFetch } from "@/lib/api";
@@ -56,6 +57,53 @@ function currentPeriodLabel(calendar: FiscalCalendar): string {
   const quarter = Math.floor(idx / 3);
   const labels = calendar.period_labels?.length ? calendar.period_labels : ["Q1", "Q2", "Q3", "Q4"];
   return labels[quarter] ?? `Q${quarter + 1}`;
+}
+
+// Compact budget-utilisation donut: remaining (success) vs committed (primary).
+function BudgetUtilisationDonut({ totalBudget, totalRemaining, currency }: { totalBudget: number; totalRemaining: number; currency: string }) {
+  const committed = Math.max(0, totalBudget - totalRemaining);
+  const pct = totalBudget > 0 ? Math.round((totalRemaining / totalBudget) * 100) : 0;
+  const donutData = [
+    { name: "Remaining", value: Math.max(0, totalRemaining), color: "#1a7f37" },
+    { name: "Committed", value: committed, color: "#004ac6" },
+  ];
+  return (
+    <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between">
+      <div className="flex items-center justify-between mb-space-sm">
+        <span className="font-headline-md text-headline-md text-on-surface">Budget Utilisation</span>
+        <span className="font-code-sm text-code-sm text-outline">Current period</span>
+      </div>
+      {totalBudget > 0 ? (
+        <div className="flex items-center gap-space-lg">
+          <div className="relative w-40 h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={donutData} dataKey="value" innerRadius={52} outerRadius={72} paddingAngle={2} stroke="none">
+                  {donutData.map((d) => <Cell key={d.name} fill={d.color} />)}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="font-numeric-metric-lg text-numeric-metric-lg text-on-surface font-bold">{pct}%</span>
+              <span className="font-code-sm text-code-sm text-outline">remaining</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-success inline-block" />
+              <span className="font-body-sm text-body-sm text-on-surface-variant">Remaining · {formatMoney(totalRemaining, currency)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-primary inline-block" />
+              <span className="font-body-sm text-body-sm text-on-surface-variant">Committed · {formatMoney(committed, currency)}</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="h-40 flex items-center justify-center text-outline font-body-sm">No budget data yet.</div>
+      )}
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -230,7 +278,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-lg">
 
           {/* Card 1: Total Budget */}
-          <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between">
+          <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow duration-150">
             <div className="flex items-start justify-between">
               <span className="font-label-caps text-label-caps uppercase text-outline">Total Allocated</span>
               <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary-container/15 text-primary"><span className="material-symbols-outlined text-[18px]">account_balance_wallet</span></span>
@@ -247,7 +295,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Card 2: Total Remaining */}
-          <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between">
+          <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow duration-150">
             <div className="flex items-start justify-between">
               <span className="font-label-caps text-label-caps uppercase text-outline">Total Remaining</span>
               <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary"><span className="material-symbols-outlined text-[18px]">savings</span></span>
@@ -268,7 +316,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Card 3: Reallocatable Surplus */}
-          <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between">
+          <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow duration-150">
             <div className="flex items-start justify-between">
               <span className="font-label-caps text-label-caps uppercase text-outline">Reallocatable</span>
               <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-success-container text-success"><span className="material-symbols-outlined text-[18px]">swap_horiz</span></span>
@@ -286,7 +334,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Card 4: Pending + Anomalies */}
-          <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between">
+          <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow duration-150">
             <div className="flex items-start justify-between">
               <span className="font-label-caps text-label-caps uppercase text-outline">Pending Reviews</span>
               <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-secondary-fixed/40 text-secondary"><span className="material-symbols-outlined text-[18px]">verified_user</span></span>
@@ -416,7 +464,10 @@ export default function DashboardPage() {
 
         
 
-        <RechartsChart />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-space-lg">
+          <RechartsChart />
+          <BudgetUtilisationDonut totalBudget={data.total_budget} totalRemaining={data.total_remaining} currency={currency} />
+        </div>
       </div>
     </Shell>
   );
