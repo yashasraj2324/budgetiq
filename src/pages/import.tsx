@@ -102,9 +102,10 @@ export default function ImportPage() {
       <div className="flex flex-col w-full gap-space-xl max-w-5xl mx-auto">
         <div>
           <h1 className="font-headline-lg text-headline-lg text-on-surface">Import Budget Data</h1>
-          <p className="font-body-sm text-on-surface-variant mt-1">
-            Refresh your numbers at any time — this is the monthly ingestion surface for ongoing monitoring.
-          </p>
+        <p className="text-sm text-on-surface-variant mt-1">
+          Refresh your numbers at any time — this is the monthly ingestion surface for ongoing monitoring.
+          Data appears on the dashboard immediately after a successful import.
+        </p>
         </div>
 
         {/* Budget lines CSV */}
@@ -150,7 +151,14 @@ export default function ImportPage() {
               or add lines manually in settings
             </Link>
           </div>
-          {lineMessage && <p className="text-sm text-primary-container font-medium" role="status">{lineMessage}</p>}
+          {lineMessage && (
+            <p className="text-sm text-primary-container font-medium flex items-center gap-2" role="status">
+              {lineMessage}
+              {lineResult?.ok && (
+                <Link to="/dashboard" className="text-primary underline font-semibold">View on dashboard →</Link>
+              )}
+            </p>
+          )}
           <ErrorsList result={lineResult} />
         </section>
 
@@ -198,7 +206,14 @@ export default function ImportPage() {
               or record a single entry on a budget line
             </Link>
           </div>
-          {spendMessage && <p className="text-sm text-primary-container font-medium" role="status">{spendMessage}</p>}
+          {spendMessage && (
+            <p className="text-sm text-primary-container font-medium flex items-center gap-2" role="status">
+              {spendMessage}
+              {spendResult?.ok && (
+                <Link to="/dashboard" className="text-primary underline font-semibold">View on dashboard →</Link>
+              )}
+            </p>
+          )}
           <ErrorsList result={spendResult} />
         </section>
 
