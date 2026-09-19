@@ -63,8 +63,15 @@ export default function ResetPasswordPage() {
       headers: { "Content-Type": "application/json", apikey: anonKey },
       body: JSON.stringify({ email, redirect_to: `${window.location.origin}/reset-password` }),
     })
-      .then((response) => {
-        if (!response.ok) throw new Error("Password reset request failed.");
+      .then(async (response) => {
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          if (response.status === 429) {
+            throw new Error("Too many reset requests from this account or network — please wait about an hour and try again.");
+          }
+          const detail = body?.error_description ?? body?.msg ?? null;
+          throw new Error(detail || "Password reset request failed.");
+        }
         setMessage("If the account exists, a password reset email has been sent.");
       })
       .catch((error: Error) => setMessage(error.message))
