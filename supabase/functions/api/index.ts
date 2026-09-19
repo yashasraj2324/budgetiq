@@ -288,6 +288,46 @@ function forecastSpend(
   return points;
 }
 
+// Backtest by withholding the last N actual points and projecting them
+// (mirrors the Python forecast service). Returns null when data is insufficient.
+function backtestForecast(
+  entries: { period: string; amount_spent: number }[],
+  holdout: number,
+): {
+  algorithm: string; holdout_periods: number; n: number; mae: number; rmse: number;
+  mape_percent: number | null; mape_unavailable_reason: string | null;
+  actuals: number[]; predictions: number[]; review_status: string; generated_at: string;
+} | null {
+  holdout = Math.min(10, Math.max(1, holdout));
+  if (entries.length < 3 + holdout) return null;
+  const train = entries.slice(0, entries.length - holdout);
+  const heldOut = entries.slice(entries.length - holdout);
+  const projected = forecastSpend(train, holdout).filter((p) => p.projected);
+  if (projected.length < holdout) return null;
+  const actuals = heldOut.map((e) => num(e.amount_spent));
+  const predictions = projected.slice(0, holdout).map((p) => p.amount);
+  const n = actuals.length;
+  const mae = actuals.reduce((sum, a, i) => sum + Math.abs(a - predictions[i]), 0) / n;
+  const rmse = Math.sqrt(actuals.reduce((sum, a, i) => sum + (a - predictions[i]) ** 2, 0) / n);
+  let mape: number | null = null;
+  if (actuals.every((a) => a !== 0)) {
+    mape = (100 * actuals.reduce((sum, a, i) => sum + Math.abs((a - predictions[i]) / a), 0)) / n;
+  }
+  return {
+    algorithm: "linear_trend_v1",
+    holdout_periods: holdout,
+    n,
+    mae: Math.round(mae * 10000) / 10000,
+    rmse: Math.round(rmse * 10000) / 10000,
+    mape_percent: mape === null ? null : Math.round(mape * 10000) / 10000,
+    mape_unavailable_reason: mape === null ? "actuals_contain_zero" : null,
+    actuals,
+    predictions: predictions.map((p) => Math.round(p * 100) / 100),
+    review_status: "pending",
+    generated_at: new Date().toISOString(),
+  };
+}
+
 // Load per-line live budget metrics for an organization.
 async function loadMetrics(
   supabase: ReturnType<typeof createClient>,
@@ -396,6 +436,33 @@ function actorEligible(userRole: string, userId: string, tier: { approver_roles?
   if (roles.has(userRole)) return true;
   const delegated = (policy?.delegated_approvers ?? []) as string[];
   return delegated.includes(userId);
+}
+
+// Accept a pending invitation: the authenticated user's email must match the
+// invitation, which then grants membership in the inviting organization.
+async function acceptInvitation(supabase: ReturnType<typeof createClient>, ctx: { user_id: string; email: string }, rawToken: string) {
+  if (!rawToken.trim()) throw new HttpError(422, "Invitation token is required");
+  const tokenHash = await hashKey(rawToken.trim());
+  const { data: inv } = await supabase.from("organization_invitations").select("*").eq("token_hash", tokenHash).maybeSingle();
+  if (!inv) throw new HttpError(404, "Invitation not found");
+  if (inv.status !== "pending") throw new HttpError(409, `Invitation is already ${inv.status}`);
+  if (new Date(String(inv.expires_at)).getTime() < Date.now()) throw new HttpError(410, "Invitation has expired");
+  if (String(inv.email).toLowerCase() !== ctx.email.toLowerCase()) {
+    throw new HttpError(403, "This invitation was issued for a different email address");
+  }
+  const { data: existingMember } = await supabase.from("organization_members")
+    .select("user_id").eq("organization_id", inv.organization_id).eq("user_id", ctx.user_id).maybeSingle();
+  if (!existingMember) {
+    const { error: memberErr } = await supabase.from("organization_members").insert({
+      organization_id: inv.organization_id as string,
+      user_id: ctx.user_id,
+      role: inv.role as string,
+    });
+    if (memberErr) throw new HttpError(500, `Unable to join organization: ${memberErr.message}`);
+  }
+  await supabase.from("organization_invitations").update({ status: "accepted" }).eq("id", inv.id);
+  await logAudit(supabase, { user_id: ctx.user_id, role: "", display_name: "", org_id: inv.organization_id as string }, "invitation_accepted", { invitation_id: inv.id, email: inv.email, role: inv.role });
+  return json({ accepted: true, organization_id: inv.organization_id });
 }
 
 // ---------------------------------------------------------------------------
@@ -756,6 +823,17 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     return json({ budget_line_id: Number(seg[1]), horizon, points });
   }
 
+  if (first === "budget-lines" && seg.length === 4 && seg[2] === "forecast" && seg[3] === "backtest" && method === "GET") {
+    const lineId = Number(seg[1]);
+    const { data: line } = await supabase.from("budget_lines").select("id").eq("organization_id", org_id).eq("id", lineId).maybeSingle();
+    if (!line) throw new HttpError(404, "Budget line not found");
+    const { data: entries } = await supabase.from("spend_entries").select("period, amount_spent").eq("organization_id", org_id).eq("budget_line_id", lineId).order("period", { ascending: true });
+    const holdout = Number(query.get("holdout")) || 2;
+    const result = backtestForecast((entries ?? []).map((e) => ({ period: String(e.period), amount_spent: num(e.amount_spent) })), holdout);
+    if (!result) throw new HttpError(422, `Insufficient data for backtest (need at least ${3 + Math.min(10, Math.max(1, holdout))} data points)`);
+    return json({ budget_line_id: lineId, ...result });
+  }
+
   // ---- Departments / performance scores -----------------------------------
   if (first === "departments" && method === "GET") {
     const { data: depts } = await supabase.from("departments").select("*").eq("organization_id", org_id).order("id", { ascending: true });
@@ -951,6 +1029,34 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     return json(recOut(updated, policy));
   }
 
+  if (first === "recommendations" && seg.length === 3 && seg[2] === "approval-state" && method === "GET") {
+    const { data: rec } = await supabase.from("recommendations").select("*").eq("organization_id", org_id).eq("id", Number(seg[1])).maybeSingle();
+    if (!rec) throw new HttpError(404, "Recommendation not found");
+    const policy = await loadApprovalPolicy(supabase, org_id);
+    return json({
+      id: Number(seg[1]),
+      approval_state: rec.status,
+      status: rec.status,
+      tier_approvals: Array.isArray(rec.tier_approvals) ? rec.tier_approvals : [],
+      approval_history: [],
+      escalated: Boolean(rec.escalated),
+      escalation: recOut(rec, policy).escalation,
+    });
+  }
+
+  if (first === "recommendations" && seg.length === 3 && seg[2] === "escalate" && method === "POST") {
+    if (!isAdmin) throw new HttpError(403, "Organization administrator role required");
+    const recId = Number(seg[1]);
+    const { data: rec } = await supabase.from("recommendations").select("id, status").eq("organization_id", org_id).eq("id", recId).maybeSingle();
+    if (!rec) throw new HttpError(404, "Recommendation not found");
+    if (["approved", "rejected", "modified"].includes(String(rec.status))) {
+      throw new HttpError(409, "Cannot escalate a finalised recommendation");
+    }
+    await supabase.from("recommendations").update({ escalated: true, escalated_at: new Date().toISOString(), escalated_by: user_id }).eq("organization_id", org_id).eq("id", recId);
+    await logAudit(supabase, ctx, "recommendation_escalated", { recommendation_id: recId });
+    return json({ escalated: true, recommendation_id: recId });
+  }
+
   // ---- Audit --------------------------------------------------------------
   if (first === "audit" && method === "GET") {
     const { data: events } = await supabase.from("audit_events").select("*").eq("organization_id", org_id).order("timestamp", { ascending: false });
@@ -1008,7 +1114,7 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     return json({ ok: true, created });
   }
 
-  if (first === "onboarding" && seg[1] === "config" && method === "GET") {
+  if ((first === "onboarding" || first === "organization") && seg[1] === "config" && method === "GET") {
     const { data: orgRow } = await supabase.from("organizations").select("name, fiscal_year, currency").eq("id", org_id).maybeSingle();
     const { data: ob } = await supabase.from("onboarding_configs").select("completed_steps, metadata").eq("organization_id", org_id).maybeSingle();
     return json({
@@ -1178,31 +1284,14 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  if (first === "organization" && seg[1] === "invitations" && seg[2] === "accept" && method === "POST") {
+  if (first === "organization" && seg[1] === "invitations" && seg.length === 3 && seg[2] === "accept" && method === "POST") {
     const body = await req.json();
-    const rawToken = String(body.token ?? "").trim();
-    if (!rawToken) throw new HttpError(422, "Invitation token is required");
-    const tokenHash = await hashKey(rawToken);
-    const { data: inv } = await supabase.from("organization_invitations").select("*").eq("token_hash", tokenHash).maybeSingle();
-    if (!inv) throw new HttpError(404, "Invitation not found");
-    if (inv.status !== "pending") throw new HttpError(409, `Invitation is already ${inv.status}`);
-    if (new Date(String(inv.expires_at)).getTime() < Date.now()) throw new HttpError(410, "Invitation has expired");
-    if (String(inv.email).toLowerCase() !== ctx.email.toLowerCase()) {
-      throw new HttpError(403, "This invitation was issued for a different email address");
-    }
-    const { data: existingMember } = await supabase.from("organization_members")
-      .select("user_id").eq("organization_id", inv.organization_id).eq("user_id", user_id).maybeSingle();
-    if (!existingMember) {
-      const { error: memberErr } = await supabase.from("organization_members").insert({
-        organization_id: inv.organization_id as string,
-        user_id,
-        role: inv.role as string,
-      });
-      if (memberErr) throw new HttpError(500, `Unable to join organization: ${memberErr.message}`);
-    }
-    await supabase.from("organization_invitations").update({ status: "accepted" }).eq("id", inv.id);
-    await logAudit(supabase, { ...ctx, org_id: inv.organization_id as string }, "invitation_accepted", { invitation_id: inv.id, email: inv.email, role: inv.role });
-    return json({ accepted: true, organization_id: inv.organization_id });
+    return acceptInvitation(supabase, ctx, String(body.token ?? ""));
+  }
+
+  if (first === "organization" && seg[1] === "invitations" && seg.length === 4 && seg[3] === "accept" && method === "POST") {
+    // Path-parameter variant for parity with the Python contract: /organization/invitations/{token}/accept
+    return acceptInvitation(supabase, ctx, seg[2]);
   }
 
   // ---- API keys -----------------------------------------------------------
@@ -1359,6 +1448,34 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     }).select().single();
     if (error) throw new HttpError(422, `Duplicate failed: ${error.message}`);
     return json(scenarioOut(created), 201);
+  }
+
+  if (first === "scenarios" && seg.length === 3 && seg[2] === "share" && method === "POST") {
+    if (!isAdmin) throw new HttpError(403, "Only admins can share scenarios organisation-wide");
+    const { data: s } = await supabase.from("scenarios").select("id").eq("organization_id", org_id).eq("id", Number(seg[1])).maybeSingle();
+    if (!s) throw new HttpError(404, "Scenario not found");
+    await supabase.from("scenarios").update({ shared: true, updated_at: new Date().toISOString() }).eq("organization_id", org_id).eq("id", Number(seg[1]));
+    return json({ shared: true, scenario_id: Number(seg[1]) });
+  }
+
+  // ---- Provider status ----------------------------------------------------
+  if (first === "providers" && seg[1] === "status" && method === "GET") {
+    const groqKey = (Deno.env.get("GROQ_API_KEY") ?? "").trim();
+    const groqConfigured = Boolean(groqKey) && !["your-groq-key-here", "dummy_key_for_testing"].includes(groqKey.toLowerCase());
+    return json({
+      providers: [
+        { name: "erp", state: "deferred", configured: false, message: "Direct ERP connectors are deferred; CSV/manual ingestion is the supported path." },
+        { name: "billing", state: "deferred", configured: false, message: "Billing is deferred and does not block core workflows." },
+        {
+          name: "explanation",
+          state: groqConfigured ? "configured" : "unavailable",
+          configured: groqConfigured,
+          message: groqConfigured
+            ? "Groq explains deterministic transfer calculations; it never sets transfer amounts."
+            : "GROQ_API_KEY is not configured — recommendation generation returns a clear error instead of fabricating a fallback.",
+        },
+      ],
+    });
   }
 
   throw new HttpError(404, "Not found");

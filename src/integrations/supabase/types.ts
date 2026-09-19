@@ -3806,6 +3806,9 @@ export type Database = {
           approved_at: string | null
           confidence: number
           created_at: string
+          escalated: boolean
+          escalated_at: string | null
+          escalated_by: string | null
           id: number
           organization_id: string
           rationale_json: Json
@@ -3819,6 +3822,9 @@ export type Database = {
           approved_at?: string | null
           confidence: number
           created_at?: string
+          escalated?: boolean
+          escalated_at?: string | null
+          escalated_by?: string | null
           id?: number
           organization_id: string
           rationale_json?: Json
@@ -3832,6 +3838,9 @@ export type Database = {
           approved_at?: string | null
           confidence?: number
           created_at?: string
+          escalated?: boolean
+          escalated_at?: string | null
+          escalated_by?: string | null
           id?: number
           organization_id?: string
           rationale_json?: Json
