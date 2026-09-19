@@ -13,6 +13,17 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url))
     }
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom", "react-router-dom"],
+          charts: ["recharts"],
+          supabase: ["@supabase/supabase-js"]
+        }
+      }
+    }
+  },
   server: {
     port: 3000,
     strictPort: true,

@@ -52,23 +52,31 @@ export default function PrioritiesPage() {
     finally { setSaving(false); }
   }
 
-  return <main className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900">
-    <div className="mx-auto max-w-3xl">
-      <p className="text-xs font-mono uppercase tracking-wider text-blue-700">Step 3 of 4 · Engine calibration</p>
-      <h1 className="mt-3 text-3xl font-bold">Define your priorities</h1>
-      <p className="mt-2 text-slate-600">Set the relative importance of each budget line. These weights are persisted for your organization.</p>
-      <section className="mt-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        {lines.length === 0 ? <p className="text-sm text-slate-500">No budget lines yet. Add data first.</p> :
-          <div className="space-y-6">{lines.map((line) => <div key={line.id}>
-            <div className="flex justify-between text-sm"><label className="font-semibold">{line.name}<span className="ml-2 text-xs font-normal text-slate-400">{line.category}</span></label><span className="font-mono text-blue-700">{line.priority_weight}</span></div>
-            <input aria-label={`${line.name} priority`} className="mt-2 w-full accent-blue-600" type="range" min="0" max="100" value={line.priority_weight} onChange={(event) => setWeight(line.id, Number(event.target.value))} />
-          </div>)}</div>}
-        {message && <p className="mt-5 text-sm text-slate-600" role="status">{message}</p>}
-        <div className="mt-8 flex flex-wrap justify-between gap-3 border-t border-slate-100 pt-5">
-          <button type="button" onClick={reset} disabled={saving || !lines.length} className="text-sm font-medium text-slate-600 underline disabled:opacity-40">Reset to defaults</button>
-          <div className="flex gap-3"><button type="button" onClick={() => save()} disabled={saving} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-50">Save</button><button type="button" onClick={() => save(true)} disabled={saving} className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : "Continue to policies"}</button></div>
-        </div>
-      </section>
-    </div>
-  </main>;
+  return (
+    <main className="min-h-screen bg-background px-4 py-12 text-on-surface font-body-md">
+      <div className="mx-auto max-w-3xl">
+        <p className="font-label-caps text-label-caps uppercase tracking-wider text-primary">Step 3 of 4 · Engine calibration</p>
+        <h1 className="mt-3 font-headline-xl text-headline-xl font-bold">Define your priorities</h1>
+        <p className="mt-2 text-on-surface-variant">Set the relative importance of each budget line. These weights are persisted for your organization.</p>
+        <section className="mt-8 rounded-xl border border-outline-variant bg-surface-container-lowest p-6 shadow-sm">
+          {lines.length === 0 ? <p className="text-sm text-on-surface-variant">No budget lines yet. Add data first.</p> :
+            <div className="space-y-6">{lines.map((line) => <div key={line.id}>
+              <div className="flex justify-between text-sm">
+                <label className="font-semibold">{line.name}<span className="ml-2 text-xs font-normal text-outline">{line.category}</span></label>
+                <span className="font-numeric-metric-md font-semibold text-primary">{line.priority_weight}</span>
+              </div>
+              <input aria-label={`${line.name} priority`} className="mt-2 w-full accent-primary" type="range" min="0" max="100" value={line.priority_weight} onChange={(event) => setWeight(line.id, Number(event.target.value))} />
+            </div>)}</div>}
+          {message && <p className="mt-5 text-sm text-on-surface-variant" role="status">{message}</p>}
+          <div className="mt-8 flex flex-wrap justify-between gap-3 border-t border-outline-variant pt-5">
+            <button type="button" onClick={reset} disabled={saving || !lines.length} className="text-sm font-medium text-on-surface-variant underline disabled:opacity-40">Reset to defaults</button>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => save()} disabled={saving} className="rounded-lg border border-outline-variant bg-surface-container px-4 py-2 text-sm font-semibold text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-50">Save</button>
+              <button type="button" onClick={() => save(true)} disabled={saving} className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-on-primary hover:bg-primary/90 transition-colors disabled:opacity-50">{saving ? "Saving…" : "Continue to policies"}</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
 }

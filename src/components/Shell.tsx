@@ -237,6 +237,11 @@ export function Shell({ children, activePath = "dashboard" }: ShellProps) {
 
         {/* ── Page content ── */}
         <main className="flex-1 overflow-y-auto bg-background px-space-xl py-space-xl">
+          {/* Small-viewport notice: the fixed sidebar layout is desktop-first. */}
+          <div className="lg:hidden mb-space-md rounded-lg bg-secondary-fixed text-secondary px-space-md py-2 font-body-sm text-body-sm flex items-center gap-space-xs border border-secondary/20">
+            <span className="material-symbols-outlined text-[16px]">desktop_windows</span>
+            <span>Best experienced on a desktop or laptop.</span>
+          </div>
           {children}
         </main>
       </div>

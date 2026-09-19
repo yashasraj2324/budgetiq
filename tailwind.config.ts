@@ -28,7 +28,7 @@ const config: Config = {
         "on-surface-variant": "#434655",
         "on-background": "#0b1c30",
         "on-error-container": "#93000a",
-        "outline": "#737686",
+        "outline": "#626570",
         "inverse-primary": "#b4c5ff",
         "on-primary-container": "#eeefff",
         "primary-container": "#2563eb",

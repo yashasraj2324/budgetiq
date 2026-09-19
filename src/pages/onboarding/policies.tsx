@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { trackEvent } from "@enter-pro/analytics-sdk";
 import { API, apiError, apiFetch } from "@/lib/api";
-import { trackEvent } from '@enter-pro/analytics-sdk';
 
 type Line = { id: number; name: string; safety_reserve: number; necessary_future_spend: number; policy_maximum_transfer: number };
 type Field = "safety_reserve" | "necessary_future_spend" | "policy_maximum_transfer";
@@ -30,5 +30,41 @@ export default function PoliciesPage() {
     finally { setSaving(false); }
   }
   const fields: [Field, string][] = [["necessary_future_spend", "Necessary future spend"], ["safety_reserve", "Safety reserve"], ["policy_maximum_transfer", "Maximum transfer"]];
-  return <main className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900"><div className="mx-auto max-w-4xl"><p className="text-xs font-mono uppercase tracking-wider text-blue-700">Step 4 of 4 · Financial policies</p><h1 className="mt-3 text-3xl font-bold">Configure financial policies</h1><p className="mt-2 text-slate-600">Protect reserves and cap transfers for every budget line.</p><section className="mt-8 overflow-x-auto rounded-xl border border-slate-200 bg-white p-6 shadow-sm"><table className="w-full min-w-[700px] text-sm"><thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-500"><th className="pb-3">Budget line</th>{fields.map(([, label]) => <th key={label} className="pb-3">{label}</th>)}</tr></thead><tbody>{lines.map((line) => <tr key={line.id} className="border-b last:border-0"><td className="py-4 pr-4 font-semibold">{line.name}</td>{fields.map(([field, label]) => <td key={field} className="py-4 pr-4"><label className="sr-only">{`${line.name} ${label}`}</label><input type="number" min="0" step="0.01" value={line[field]} onChange={(event) => update(line.id, field, Number(event.target.value))} className="w-full rounded border border-slate-300 px-3 py-2" /></td>)}</tr>)}</tbody></table>{!lines.length && <p className="py-5 text-sm text-slate-500">No budget lines yet. Add data first.</p>}{message && <p className="mt-5 text-sm text-slate-600" role="status">{message}</p>}<div className="mt-8 flex justify-between border-t border-slate-100 pt-5"><button type="button" onClick={() => persist(true)} disabled={saving || !lines.length} className="text-sm font-medium text-slate-600 underline disabled:opacity-40">Reset policies</button><div className="flex gap-3"><button type="button" onClick={() => persist()} disabled={saving || !lines.length} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-50">Save</button><button type="button" onClick={() => persist()} disabled={saving || !lines.length} className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : "Complete setup"}</button></div></div></section></div></main>;
+  return (
+    <main className="min-h-screen bg-background px-4 py-12 text-on-surface font-body-md">
+      <div className="mx-auto max-w-4xl">
+        <p className="font-label-caps text-label-caps uppercase tracking-wider text-primary">Step 4 of 4 · Financial policies</p>
+        <h1 className="mt-3 font-headline-xl text-headline-xl font-bold">Configure financial policies</h1>
+        <p className="mt-2 text-on-surface-variant">Protect reserves and cap transfers for every budget line.</p>
+        <section className="mt-8 overflow-x-auto rounded-xl border border-outline-variant bg-surface-container-lowest p-6 shadow-sm">
+          <table className="w-full min-w-[700px] text-sm">
+            <thead>
+              <tr className="border-b border-outline-variant text-left text-xs uppercase tracking-wide text-outline">
+                <th className="pb-3 font-label-caps text-label-caps">Budget line</th>
+                {fields.map(([, label]) => <th key={label} className="pb-3 font-label-caps text-label-caps">{label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line) => <tr key={line.id} className="border-b border-outline-variant last:border-0">
+                <td className="py-4 pr-4 font-semibold">{line.name}</td>
+                {fields.map(([field, label]) => <td key={field} className="py-4 pr-4">
+                  <label className="sr-only">{`${line.name} ${label}`}</label>
+                  <input type="number" min="0" step="0.01" value={line[field]} onChange={(event) => update(line.id, field, Number(event.target.value))} className="w-full rounded border border-outline-variant bg-surface-container px-3 py-2 text-on-surface" />
+                </td>)}
+              </tr>)}
+            </tbody>
+          </table>
+          {!lines.length && <p className="py-5 text-sm text-on-surface-variant">No budget lines yet. Add data first.</p>}
+          {message && <p className="mt-5 text-sm text-on-surface-variant" role="status">{message}</p>}
+          <div className="mt-8 flex justify-between border-t border-outline-variant pt-5">
+            <button type="button" onClick={() => persist(true)} disabled={saving || !lines.length} className="text-sm font-medium text-on-surface-variant underline disabled:opacity-40">Reset policies</button>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => persist()} disabled={saving || !lines.length} className="rounded-lg border border-outline-variant bg-surface-container px-4 py-2 text-sm font-semibold text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-50">Save</button>
+              <button type="button" onClick={() => persist()} disabled={saving || !lines.length} className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-on-primary hover:bg-primary/90 transition-colors disabled:opacity-50">{saving ? "Saving…" : "Continue to dashboard"}</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
 }

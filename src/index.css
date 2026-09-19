@@ -18,3 +18,19 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Global focus visibility (WCAG 2.4.7 Focus Visible) */
+:focus-visible {
+  outline: 2px solid #004ac6;
+  outline-offset: 2px;
+}
+
+/* Respect reduced-motion preferences (WCAG 2.3.3) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
