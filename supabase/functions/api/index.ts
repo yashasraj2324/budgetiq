@@ -220,6 +220,32 @@ function detectVelocityAnomaly(
   };
 }
 
+function median(values: number[]): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+// Structural (allocation-level) anomalies need no spend history: a line whose
+// budget cannot cover its committed future spend + reserve, or an outsized
+// allocation paired with low strategic priority.
+function structuralAnomalies(
+  line: { allocated_amount: unknown; priority_weight: unknown; necessary_future_spend: unknown; safety_reserve: unknown },
+  remaining: number,
+  medianAllocation: number,
+): { type: "underfunded" | "allocation_outlier"; deficit?: number }[] {
+  const out: { type: "underfunded" | "allocation_outlier"; deficit?: number }[] = [];
+  const commitments = num(line.necessary_future_spend) + num(line.safety_reserve);
+  if (remaining < commitments) {
+    out.push({ type: "underfunded", deficit: money(commitments - remaining) });
+  }
+  if (medianAllocation > 0 && num(line.allocated_amount) > 6 * medianAllocation && Number(line.priority_weight) < 60) {
+    out.push({ type: "allocation_outlier" });
+  }
+  return out;
+}
+
 function calculateTransfer(
   remainingBudget: number,
   necessaryFutureSpend: number,
@@ -526,11 +552,13 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     const totalRemaining = visible.reduce((a, l) => a + l.remaining_budget, 0);
     const reallocatable = visible.reduce((a, l) => a + Math.max(0, l.remaining_budget - num(l.necessary_future_spend) - num(l.safety_reserve)), 0);
 
+    const medianAllocation = median((allLines ?? []).map((l) => num(l.allocated_amount)));
     let anomalyCount = 0;
     for (const l of visible) {
       const { data: entries } = await supabase.from("spend_entries").select("amount_spent").eq("organization_id", org_id).eq("budget_line_id", Number(l.id)).order("period", { ascending: true });
-      const anomaly = detectVelocityAnomaly((entries ?? []).map((e) => num(e.amount_spent)));
-      if (anomaly.detected) anomalyCount += 1;
+      const velocity = detectVelocityAnomaly((entries ?? []).map((e) => num(e.amount_spent)));
+      const structural = structuralAnomalies(l, l.remaining_budget, medianAllocation);
+      if (velocity.detected || structural.length) anomalyCount += 1;
     }
 
     const paged = pageItems(visible, page, pageSize);
@@ -582,23 +610,41 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
 
   // ---- Anomalies ----------------------------------------------------------
   if (first === "anomalies" && method === "GET") {
-    const { data: lines } = await supabase.from("budget_lines").select("id, name, department_id").eq("organization_id", org_id);
+    const { data: lines } = await supabase.from("budget_lines").select("id, name, department_id, allocated_amount, priority_weight, necessary_future_spend, safety_reserve").eq("organization_id", org_id);
     const { data: depts } = await supabase.from("departments").select("id, name").eq("organization_id", org_id);
     const deptName = new Map((depts ?? []).map((d) => [Number(d.id), d.name as string]));
+    const metrics = await loadMetrics(supabase, org_id);
+    const medianAllocation = median((lines ?? []).map((l) => num(l.allocated_amount)));
     const out = [];
     for (const line of lines ?? []) {
-      const { data: entries } = await supabase.from("spend_entries").select("amount_spent").eq("organization_id", org_id).eq("budget_line_id", Number(line.id)).order("period", { ascending: true });
-      if (!entries?.length) continue;
-      const anomaly = detectVelocityAnomaly(entries.map((e) => num(e.amount_spent)));
-      if (anomaly.detected) {
+      const lineId = Number(line.id);
+      const { data: entries } = await supabase.from("spend_entries").select("amount_spent").eq("organization_id", org_id).eq("budget_line_id", lineId).order("period", { ascending: true });
+      const velocity = detectVelocityAnomaly((entries ?? []).map((e) => num(e.amount_spent)));
+      const remaining = liveRemaining(line, metrics);
+      const structural = structuralAnomalies(line, remaining, medianAllocation);
+      const base = {
+        budget_line_id: lineId,
+        budget_line_name: line.name,
+        department_name: deptName.get(Number(line.department_id)) ?? "",
+      };
+      if (velocity.detected) {
         out.push({
-          budget_line_id: Number(line.id),
-          budget_line_name: line.name,
-          department_name: deptName.get(Number(line.department_id)) ?? "",
-          velocity_multiplier: anomaly.velocity_multiplier,
-          recent_rate: money(anomaly.recent_rate),
-          baseline_rate: money(anomaly.baseline_rate),
-          period_remaining: anomaly.period_remaining,
+          ...base,
+          anomaly_type: "velocity",
+          anomaly_types: ["velocity"],
+          velocity_multiplier: velocity.velocity_multiplier,
+          recent_rate: money(velocity.recent_rate),
+          baseline_rate: money(velocity.baseline_rate),
+          period_remaining: velocity.period_remaining,
+        });
+      } else if (structural.length) {
+        out.push({
+          ...base,
+          anomaly_type: structural[0].type,
+          anomaly_types: structural.map((s) => s.type),
+          deficit: structural[0].deficit,
+          remaining_budget: money(remaining),
+          velocity_multiplier: velocity.velocity_multiplier,
         });
       }
     }
@@ -630,18 +676,25 @@ async function handleRequest(req: Request, supabase: ReturnType<typeof createCli
     const metrics = await loadMetrics(supabase, org_id);
     const { data: dept } = await supabase.from("departments").select("name").eq("organization_id", org_id).eq("id", Number(line.department_id)).maybeSingle();
     const { data: entries } = await supabase.from("spend_entries").select("period, amount_spent").eq("organization_id", org_id).eq("budget_line_id", Number(line.id)).order("period", { ascending: true });
-    const anomaly = detectVelocityAnomaly((entries ?? []).map((e) => num(e.amount_spent)));
+    const remaining = liveRemaining(line, metrics);
+    const velocity = detectVelocityAnomaly((entries ?? []).map((e) => num(e.amount_spent)));
+    const { data: allLines } = await supabase.from("budget_lines").select("allocated_amount").eq("organization_id", org_id);
+    const structural = structuralAnomalies(line, remaining, median((allLines ?? []).map((l) => num(l.allocated_amount))));
     return json({
       id: Number(line.id),
       name: line.name,
       department_id: Number(line.department_id),
       department_name: dept?.name ?? "",
       allocated_amount: num(line.allocated_amount),
-      remaining_budget: liveRemaining(line, metrics),
+      remaining_budget: remaining,
       priority_weight: Number(line.priority_weight),
       category: line.category,
       spend_entries: (entries ?? []).map((e) => ({ period: e.period, amount_spent: num(e.amount_spent) })),
-      anomaly: anomaly.detected ? { velocity_multiplier: anomaly.velocity_multiplier, recent_rate: money(anomaly.recent_rate), baseline_rate: money(anomaly.baseline_rate) } : null,
+      anomaly: velocity.detected
+        ? { type: "velocity", velocity_multiplier: velocity.velocity_multiplier, recent_rate: money(velocity.recent_rate), baseline_rate: money(velocity.baseline_rate) }
+        : structural.length
+          ? { type: structural[0].type, deficit: structural[0].deficit }
+          : null,
     });
   }
 

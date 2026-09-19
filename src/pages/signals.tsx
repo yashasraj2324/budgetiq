@@ -9,10 +9,14 @@ interface AnomalySignal {
   budget_line_id: number;
   budget_line_name: string;
   department_name: string;
-  velocity_multiplier: number;
-  recent_rate: number;
-  baseline_rate: number;
-  period_remaining: number;
+  anomaly_type?: "velocity" | "underfunded" | "allocation_outlier" | string;
+  anomaly_types?: string[];
+  velocity_multiplier?: number;
+  recent_rate?: number;
+  baseline_rate?: number;
+  period_remaining?: number;
+  deficit?: number;
+  remaining_budget?: number;
 }
 
 interface BudgetLine {
@@ -31,6 +35,12 @@ function SeverityBadge({ multiplier }: { multiplier: number }) {
   if (multiplier >= 2)
     return <span className="px-2 py-0.5 rounded bg-secondary-fixed text-secondary font-code-sm font-bold">High {multiplier.toFixed(1)}×</span>;
   return <span className="px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-code-sm font-bold">Moderate {multiplier.toFixed(1)}×</span>;
+}
+
+function StructuralBadge({ type }: { type: string }) {
+  if (type === "underfunded")
+    return <span className="px-2 py-0.5 rounded bg-error-container text-error font-code-sm font-bold">Underfunded</span>;
+  return <span className="px-2 py-0.5 rounded bg-secondary-fixed text-secondary font-code-sm font-bold">Allocation Outlier</span>;
 }
 
 export default function SignalsPage() {
@@ -99,9 +109,9 @@ export default function SignalsPage() {
             <span className="material-symbols-outlined text-secondary text-[20px]">crisis_alert</span>
             <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider">Anomaly Detection Engine</span>
           </div>
-          <h1 className="font-headline-lg text-headline-lg text-on-surface">Spend Velocity Signals</h1>
+          <h1 className="font-headline-lg text-headline-lg text-on-surface">Anomaly Signals</h1>
           <p className="font-body-sm text-on-surface-variant mt-1">
-            Lines exhibiting statistically significant spend acceleration. Each signal is a candidate for reallocation.
+            Spend-velocity spikes and allocation problems (underfunded lines, allocation outliers) flagged for review.
           </p>
         </div>
 
@@ -112,7 +122,7 @@ export default function SignalsPage() {
           <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-space-xl text-center">
             <span className="material-symbols-outlined text-[48px] text-outline mb-space-md block">check_circle</span>
             <h2 className="font-headline-md text-on-surface">No Active Anomalies</h2>
-            <p className="font-body-md text-on-surface-variant mt-2">All budget lines are within normal velocity ranges.</p>
+            <p className="font-body-md text-on-surface-variant mt-2">No velocity or allocation anomalies detected in the current budget data.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-space-md">
@@ -121,6 +131,7 @@ export default function SignalsPage() {
               const surplusAmt = sourceLine ? surplus(sourceLine) : 0;
               const targets = sourceLine ? targetOptions(sig.budget_line_id) : [];
               const isGenerating = generating === sig.budget_line_id;
+              const isVelocity = sig.anomaly_type === "velocity";
 
               return (
                 <div
@@ -132,7 +143,14 @@ export default function SignalsPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-space-sm flex-wrap">
                         <h2 className="font-headline-md text-on-surface">{sig.budget_line_name}</h2>
-                        <SeverityBadge multiplier={sig.velocity_multiplier} />
+                        {isVelocity ? (
+                          <SeverityBadge multiplier={sig.velocity_multiplier ?? 1} />
+                        ) : (
+                          <StructuralBadge type={sig.anomaly_type ?? "underfunded"} />
+                        )}
+                        {(sig.anomaly_types?.length ?? 0) > 1 && (
+                          <span className="font-code-sm text-outline">+{(sig.anomaly_types?.length ?? 1) - 1} signal</span>
+                        )}
                       </div>
                       <p className="font-body-sm text-on-surface-variant mt-0.5">{sig.department_name}</p>
                     </div>
@@ -146,21 +164,37 @@ export default function SignalsPage() {
                     </div>
                   </div>
 
-                  {/* Velocity metrics */}
-                  <div className="grid grid-cols-3 gap-space-md">
-                    <div className="bg-surface-container p-space-sm rounded-lg border border-outline-variant text-center">
-                      <div className="font-label-caps text-label-caps uppercase text-outline mb-1">Recent Rate</div>
-                      <div className="font-numeric-table text-on-surface font-semibold">{formatINR(sig.recent_rate)}<span className="text-outline font-normal">/wk</span></div>
+                  {isVelocity ? (
+                    /* Velocity metrics */
+                    <div className="grid grid-cols-3 gap-space-md">
+                      <div className="bg-surface-container p-space-sm rounded-lg border border-outline-variant text-center">
+                        <div className="font-label-caps text-label-caps uppercase text-outline mb-1">Recent Rate</div>
+                        <div className="font-numeric-table text-on-surface font-semibold">{formatINR(sig.recent_rate ?? 0)}<span className="text-outline font-normal">/wk</span></div>
+                      </div>
+                      <div className="bg-surface-container p-space-sm rounded-lg border border-outline-variant text-center">
+                        <div className="font-label-caps text-label-caps uppercase text-outline mb-1">Baseline Rate</div>
+                        <div className="font-numeric-table text-on-surface font-semibold">{formatINR(sig.baseline_rate ?? 0)}<span className="text-outline font-normal">/wk</span></div>
+                      </div>
+                      <div className="bg-surface-container p-space-sm rounded-lg border border-outline-variant text-center">
+                        <div className="font-label-caps text-label-caps uppercase text-outline mb-1">Periods Left</div>
+                        <div className="font-numeric-table text-on-surface font-semibold">{sig.period_remaining} <span className="text-outline font-normal">wks</span></div>
+                      </div>
                     </div>
-                    <div className="bg-surface-container p-space-sm rounded-lg border border-outline-variant text-center">
-                      <div className="font-label-caps text-label-caps uppercase text-outline mb-1">Baseline Rate</div>
-                      <div className="font-numeric-table text-on-surface font-semibold">{formatINR(sig.baseline_rate)}<span className="text-outline font-normal">/wk</span></div>
+                  ) : (
+                    /* Structural metrics */
+                    <div className="grid grid-cols-2 gap-space-md">
+                      <div className="bg-surface-container p-space-sm rounded-lg border border-outline-variant text-center">
+                        <div className="font-label-caps text-label-caps uppercase text-outline mb-1">Funding Shortfall</div>
+                        <div className="font-numeric-table text-on-surface font-semibold">{formatINR(sig.deficit ?? 0)}</div>
+                      </div>
+                      <div className="bg-surface-container p-space-sm rounded-lg border border-outline-variant text-center">
+                        <div className="font-label-caps text-label-caps uppercase text-outline mb-1">Commitments vs Remaining</div>
+                        <div className="font-numeric-table text-on-surface font-semibold">
+                          {formatINR(sig.remaining_budget ?? 0)} <span className="text-outline font-normal">left</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="bg-surface-container p-space-sm rounded-lg border border-outline-variant text-center">
-                      <div className="font-label-caps text-label-caps uppercase text-outline mb-1">Periods Left</div>
-                      <div className="font-numeric-table text-on-surface font-semibold">{sig.period_remaining} <span className="text-outline font-normal">wks</span></div>
-                    </div>
-                  </div>
+                  )}
 
                   {/* Surplus + target preview */}
                   <div className="flex items-center justify-between gap-space-md flex-wrap">
