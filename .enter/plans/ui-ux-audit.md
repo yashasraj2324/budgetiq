@@ -716,3 +716,116 @@ icon state); recommendations/audit/reports/scenarios/settings are inconsistent.
       rule.
 - [ ] Functional regression: signup → onboarding → import → dashboard → signals
       → generate → approve still completes with 200s.
+
+---
+
+# Part 5 — Gateway Modularization (split of `supabase/functions/api/index.ts`)
+
+## Context
+
+The backend gateway is a single ~1,960-line file (auth, every route, CSV
+parsing, AI reasoning, serializers, tokens). It deploys and works, but is hard
+to navigate and high-risk to change. This refactor **splits it into modules with
+zero behavior change** — same helpers, same routes, same responses. The
+frontend is untouched. Deploy target: `[functions.api]` (verify_jwt = false,
+already configured).
+
+## Target module map (under `supabase/functions/api/`)
+
+Pure library layer (no route logic):
+
+| Module | Contents (moved verbatim) | Depends on |
+|---|---|---|
+| `_lib/constants.ts` | `corsHeaders`, `ADMIN_ROLES`, `APPROVER_ROLES`, `SUPPORTED_ROLES`, `PREFIX`, `DEV_TOKEN_DISABLED` | — |
+| `_lib/helpers.ts` | `json`, `csvResponse`, `HttpError`, `num`, `money`, `pageItems` | — |
+| `_lib/tokens.ts` | `generateToken`, `generateKey`, `hashKey` | — |
+| `_lib/csv.ts` | `parseCsv` | — |
+| `_lib/engine.ts` | `detectVelocityAnomaly`, `median`, `structuralAnomalies`, `calculateTransfer`, `validateCustomAmount`, `forecastSpend`, `backtestForecast` | helpers (`num`) |
+| `_lib/serializers.ts` | `recOut`, `apiKeyOut`, `scenarioOut`, `sourceRemainingSafetyCheck` | helpers |
+| `_lib/metrics.ts` | `loadMetrics`, `liveRemaining`, `usersByEmail`, `logAudit` | helpers |
+| `_lib/approvals.ts` | `loadApprovalPolicy`, `actorEligible`, `acceptInvitation` | constants, helpers, tokens, metrics |
+| `_lib/auth.ts` | `resolveAuth`, `requiredScope` | constants, helpers, tokens |
+| `_lib/reasoning.ts` | `groqReasoning` | — |
+| `_lib/types.ts` | `type Supabase = ReturnType<typeof createClient>`; `type Ctx = { user_id; org_id; role; display_name; email; auth_mode; scopes }` | esm.sh `createClient` import |
+
+Route layer (each exports `handleX(c: RouteContext): Promise<Response | null>`):
+
+| Module | Routes it handles |
+|---|---|
+| `routes/dashboard.ts` | `/dashboard` GET, `/dashboard/export.csv`, `/anomalies` GET |
+| `routes/budget-lines.ts` | budget-lines CRUD, import, template, spend, forecast, backtest; `/departments` GET/POST; `/performance-scores` |
+| `routes/recommendations.ts` | list, generate, detail, approve/reject/modify, approval-state, escalate |
+| `routes/audit.ts` | `/audit` GET |
+| `routes/onboarding.ts` | onboarding data/config/priorities/policies |
+| `routes/organization.ts` | fiscal-calendar, members, invitations, accept |
+| `routes/api-keys.ts` | api-keys list/create/rotate/revoke |
+| `routes/governance.ts` | approval-policy GET/PUT |
+| `routes/scenarios.ts` | scenarios CRUD/duplicate/share |
+| `routes/providers.ts` | `/providers/status` |
+
+Shared route context in `_lib/types.ts`:
+
+```ts
+export interface RouteContext {
+  req: Request; supabase: Supabase; ctx: Ctx;
+  path: string; method: string;
+  seg: string[]; query: URLSearchParams; url: URL;
+}
+```
+
+`index.ts` after the split (only):
+
+```ts
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
+import { corsHeaders, PREFIX } from "./_lib/constants.ts";
+import { HttpError, json } from "./_lib/helpers.ts";
+import { resolveAuth } from "./_lib/auth.ts";
+import { handlers } from "./routes/mod.ts"; // ordered array
+Deno.serve(async (req) => { /* OPTIONS → ok; build RouteContext; loop handlers; 404 */ });
+```
+
+`routes/mod.ts` exports `handlers: RouteHandler[]` in the current route order so
+first-match behavior is preserved exactly.
+
+## Files to modify / create
+
+- New: `_lib/constants.ts`, `_lib/helpers.ts`, `_lib/tokens.ts`, `_lib/csv.ts`,
+  `_lib/engine.ts`, `_lib/serializers.ts`, `_lib/metrics.ts`, `_lib/approvals.ts`,
+  `_lib/auth.ts`, `_lib/reasoning.ts`, `_lib/types.ts`
+- New: `routes/mod.ts` + the 10 route modules above
+- Rewrite: `supabase/functions/api/index.ts` (entrypoint only)
+- Unchanged: `src/**`, `supabase/config.toml`, `supabase/migrations/**`
+
+## Implementation checklist
+
+- [ ] `_lib/*` modules created by moving each function verbatim (no logic edits);
+      import graph verified acyclic (constants → helpers → tokens/csv/engine →
+      serializers/metrics → approvals → auth/reasoning → routes → index).
+- [ ] `_lib/types.ts` defines `Supabase`, `Ctx`, `RouteContext`, `RouteHandler`.
+- [ ] Each `routes/*.ts` module returns `null` when no route matches and keeps
+      the exact request handling (same status codes, same bodies, same audit
+      calls, same `isAdmin` checks).
+- [ ] `routes/mod.ts` orders handlers to match the current first-match order.
+- [ ] `index.ts` rewritten: OPTIONS CORS, `resolveAuth`, handler loop, 404
+      fallback; `PREFIX` and `/api` prefix stripping preserved.
+- [ ] `grep` confirms no leftover route/helper code in `index.ts` beyond the
+      entrypoint, and no duplicate function definitions across the function dir.
+- [ ] `pnpm build` + `pnpm lint` (frontend untouched — must stay green).
+
+## Verification checklist
+
+- [ ] Deploy `supabase/functions/api` successfully.
+- [ ] Live smoke tests against the deployed gateway:
+  - [ ] No auth → 401 on `/dashboard`.
+  - [ ] Valid API key → `GET /dashboard` 200; key without `scenarios:write` →
+        `POST /scenarios` 403.
+  - [ ] `GET /budget-lines/import/template` → 200 CSV (department_name header).
+  - [ ] `POST /budget-lines/import` with an invalid CSV → 422 with row errors.
+  - [ ] `GET /providers/status` → 200.
+  - [ ] Full round-trip on a test workspace: import lines → import spend →
+        generate → approve → audit event present (all 2xx).
+- [ ] `supabase_search_edge_function_logs` for the `api` function shows no new
+      runtime errors after the smoke tests.
+- [ ] Function startup log shows a single clean boot (no missing-module error).
+- [ ] `grep` over `src/` confirms no code referenced the internal gateway layout
+      (frontend uses `${API}/…` only) — nothing to update there.
